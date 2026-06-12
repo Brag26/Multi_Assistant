@@ -1,0 +1,61 @@
+# ─── Supabase ────────────────────────────────────────────────────────────────
+# supabase.com → your project → Settings → API
+
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...your_anon_key_here...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...your_service_role_key_here...
+
+# ─── Database ────────────────────────────────────────────────────────────────
+# supabase.com → your project → Settings → Database → Connection string → URI
+# Change [YOUR-PASSWORD] to your Supabase DB password
+
+DATABASE_URL=postgresql+asyncpg://postgres:[YOUR-PASSWORD]@db.YOUR_PROJECT_ID.supabase.co:5432/postgres
+
+# ─── Redis ───────────────────────────────────────────────────────────────────
+# Local:      redis://localhost:6379
+# Upstash:    rediss://default:YOUR_TOKEN@YOUR_HOST.upstash.io:6379
+# Railway:    provided automatically as $REDIS_URL
+
+REDIS_URL=redis://localhost:6379
+
+# ─── Vapi ────────────────────────────────────────────────────────────────────
+# app.vapi.ai → Account → API Keys
+
+VAPI_API_KEY=your_vapi_api_key_here
+VAPI_BASE_URL=https://api.vapi.ai
+
+# ─── Twilio ──────────────────────────────────────────────────────────────────
+# console.twilio.com → Account Info (top left of dashboard)
+
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+TWILIO_PHONE_NUMBER=+15550000000
+
+# ─── Make.com ────────────────────────────────────────────────────────────────
+# make.com → your scenario → add a Custom Webhook module → copy the URL
+
+MAKE_WEBHOOK_URL=https://hook.eu1.make.com/your_webhook_id
+MAKE_WEBHOOK_SECRET=your_optional_signing_secret
+
+# ─── Frontend (Next.js public vars) ──────────────────────────────────────────
+# Change to your deployed backend URL once live
+# Local dev: http://localhost:8000/api/v1
+
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...your_anon_key_here...
+
+# Optional: skip auth for local development
+# Set this to any tenant ID from your database
+NEXT_PUBLIC_DEMO_TENANT_ID=
+
+# ─── Backend (FastAPI) ───────────────────────────────────────────────────────
+SECRET_KEY=change_this_to_a_long_random_string_at_least_32_chars
+ENVIRONMENT=development
+# development | production
+DEBUG=true
+ALLOWED_ORIGINS=http://localhost:3000,https://your-frontend.vercel.app
+
+# ─── Celery (background jobs) ────────────────────────────────────────────────
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
