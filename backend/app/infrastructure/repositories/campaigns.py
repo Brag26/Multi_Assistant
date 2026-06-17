@@ -1,4 +1,5 @@
-﻿from uuid import UUID
+﻿from typing import List
+from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,7 +70,7 @@ class SqlAlchemyCampaignRepository:
         await self.session.refresh(clone)
         return clone
 
-    async def assign_contacts(self, campaign_id: str, contact_ids: list[UUID], commit: bool = True) -> None:
+    async def assign_contacts(self, campaign_id: str, contact_ids: List[UUID], commit: bool = True) -> None:
         await self.session.execute(delete(CampaignContactModel).where(CampaignContactModel.campaign_id == campaign_id))
         for contact_id in contact_ids:
             self.session.add(CampaignContactModel(campaign_id=campaign_id, contact_id=str(contact_id)))

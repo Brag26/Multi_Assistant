@@ -1,4 +1,5 @@
 ﻿from datetime import UTC, datetime
+from typing import List
 from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
@@ -40,7 +41,7 @@ class SqlAlchemyIntegrationRepository:
             await self.session.refresh(integration)
         return integration
 
-    async def upsert_assets(self, tenant_id: str, provider: IntegrationProvider, assets: list[dict]):
+    async def upsert_assets(self, tenant_id: str, provider: IntegrationProvider, assets: List[dict]):
         for asset in assets:
             stmt = insert(IntegrationAssetModel).values(
                 tenant_id=tenant_id,

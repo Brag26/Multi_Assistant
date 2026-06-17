@@ -1,4 +1,5 @@
 ﻿import re
+from typing import List
 from uuid import UUID
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -97,7 +98,7 @@ class SqlAlchemyContactRepository:
         result = await self.session.execute(select(SegmentModel).where(SegmentModel.tenant_id == tenant_id).order_by(SegmentModel.created_at.desc()))
         return result.scalars().all()
 
-    async def _sync_tags(self, contact_id: str, tag_ids: list[UUID]) -> None:
+    async def _sync_tags(self, contact_id: str, tag_ids: List[UUID]) -> None:
         await self.session.execute(delete(ContactTagModel).where(ContactTagModel.contact_id == contact_id))
         for tag_id in tag_ids:
             self.session.add(ContactTagModel(contact_id=contact_id, tag_id=str(tag_id)))
