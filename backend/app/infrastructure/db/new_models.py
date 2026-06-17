@@ -74,3 +74,17 @@ class CampaignReportModel(Base):
     outcomes: Mapped[dict] = mapped_column(JSONB, default=dict)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     campaign = relationship("CampaignModel")
+
+
+class OutboundWebhookModel(Base):
+    __tablename__ = "outbound_webhooks"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    target_url: Mapped[str] = mapped_column(Text, nullable=False)
+    events: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
+    secret: Mapped[str | None] = mapped_column(String(120))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status_code: Mapped[str | None] = mapped_column(String(10))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -15,14 +15,11 @@ import httpx
 import structlog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select, delete
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 
 from app.api.deps import get_db_session
 from app.core.security import CurrentUser
-from app.infrastructure.db.base import Base
+from app.infrastructure.db.new_models import OutboundWebhookModel
 
 log = structlog.get_logger()
 
@@ -33,20 +30,6 @@ AVAILABLE_EVENTS = [
     "campaign_started", "campaign_completed",
     "workflow_activated", "workflow_failed",
 ]
-
-
-class OutboundWebhookModel(Base):
-    __tablename__ = "outbound_webhooks"
-    id: Mapped[str] = mapped_column(PG_UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
-    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
-    target_url: Mapped[str] = mapped_column(Text, nullable=False)
-    events: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
-    secret: Mapped[str | None] = mapped_column(String(120))
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    last_status_code: Mapped[int | None] = mapped_column(String(10))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 router = APIRouter(prefix="/tenants/{tenant_id}/outbound-webhooks", tags=["outbound-webhooks"])

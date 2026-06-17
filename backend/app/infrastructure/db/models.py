@@ -385,5 +385,5 @@ from app.infrastructure.db.new_models import (  # noqa: E402,F401
     SlackConfigModel,
     CalendarConfigModel,
     CampaignReportModel,
+    OutboundWebhookModel,
 )
-from app.api.v1.outbound_webhooks import OutboundWebhookModel  # noqa: E402,F401
