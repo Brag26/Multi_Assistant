@@ -372,13 +372,13 @@ class LeadActivityCreate(BaseModel):
 
 
 class LeadActivityRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
     id: UUID
     tenant_id: UUID
     contact_id: UUID
     activity_type: str
     summary: str | None
-    metadata: dict
+    metadata: dict = Field(default_factory=dict, validation_alias="metadata_")
     created_at: datetime
 
 

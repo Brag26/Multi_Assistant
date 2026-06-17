@@ -68,7 +68,7 @@ class SqlAlchemyLeadActivityRepository:
             contact_id=contact_id,
             activity_type=activity_type,
             summary=summary,
-            metadata=metadata,
+            metadata_=metadata,
         )
         self.session.add(activity)
         await self.session.commit()
