@@ -143,9 +143,9 @@ async def list_versions(
 async def create_version(
     tenant_id: str,
     workflow_id: UUID,
+    user: CurrentUser,
+    service: Annotated[WorkflowService, Depends(workflow_service)],
     payload: dict = Body(default={}),
-    user: CurrentUser = Depends(),
-    service: Annotated[WorkflowService, Depends(workflow_service)] = Depends(),
 ):
     return await service.create_version(user, tenant_id, workflow_id, payload.get("config", {}))
 
