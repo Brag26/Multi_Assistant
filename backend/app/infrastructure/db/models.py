@@ -376,3 +376,14 @@ class AnalyticsSnapshotModel(Base):
     snapshot_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     metrics: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Phase 2 feature models (imported for Alembic/metadata registration) ────
+from app.infrastructure.db.new_models import (  # noqa: E402,F401
+    DncListModel,
+    CallRetryQueueModel,
+    SlackConfigModel,
+    CalendarConfigModel,
+    CampaignReportModel,
+)
+from app.api.v1.outbound_webhooks import OutboundWebhookModel  # noqa: E402,F401

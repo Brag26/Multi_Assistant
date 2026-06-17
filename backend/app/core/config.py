@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
     supabase_url: str = ""
-    supabase_jwks_url: str
+    supabase_jwks_url: str = ""
     supabase_jwt_audience: str = "authenticated"
     supabase_service_role_key: str = ""
     cors_origins: str = "http://localhost:3000"
@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_webhook_secret: str = ""
     make_webhook_signing_secret: str = ""
+    google_client_id: str = ""
+    google_client_secret: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

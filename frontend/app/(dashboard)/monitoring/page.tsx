@@ -5,9 +5,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
 import { listCalls, listCallEvents, type CallRecord } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/shell";
+import { LiveTranscriptPanel } from "@/components/dashboard/LiveTranscriptPanel";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PhoneCall, ChevronRight, Activity, Clock, Mic } from "lucide-react";
+import { PhoneCall, Activity, Clock, Mic } from "lucide-react";
 
 const STATUS_STYLE: Record<string, string> = {
   completed:   "bg-emerald-50 text-emerald-700",
@@ -37,6 +38,7 @@ export default function CallMonitoringPage() {
   });
 
   const selectedCall = calls.find(c => c.id === selectedCallId);
+  const isCallActive = selectedCall?.status === "in_progress";
 
   return (
     <DashboardShell>
@@ -137,6 +139,13 @@ export default function CallMonitoringPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Live transcript — polls while call is in progress */}
+              <LiveTranscriptPanel
+                tenantId={tenantId}
+                callId={selectedCall.id}
+                isActive={isCallActive}
+              />
 
               {/* Event timeline */}
               <Card>
