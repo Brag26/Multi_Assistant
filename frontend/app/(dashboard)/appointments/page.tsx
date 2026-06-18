@@ -28,8 +28,8 @@ export default function AppointmentsPage() {
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      updateAppointment(tenantId, id, { status: status as any }),
+    mutationFn: ({ id, status }: { id: string; status: "scheduled" | "completed" | "canceled" }) =>
+      updateAppointment(tenantId, id, { status }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments", tenantId] }),
   });
 

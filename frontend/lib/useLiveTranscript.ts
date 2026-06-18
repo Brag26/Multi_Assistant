@@ -37,7 +37,7 @@ export function useLiveTranscript(tenantId: string, callId: string | null, isAct
           if (seenIds.current.has(ev.id)) continue;
           seenIds.current.add(ev.id);
 
-          const data = ev.event_data as any;
+          const data = ev.event_data as { speaker?: "agent" | "customer" | "system"; text?: string };
           newChunks.push({
             speaker: data.speaker ?? "system",
             text: data.text ?? "",

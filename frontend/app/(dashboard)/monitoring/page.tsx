@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
-import { listCalls, listCallEvents, type CallRecord } from "@/lib/api";
+import { listCalls, listCallEvents, type CallRecord, type CallMonitoringEvent } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { LiveTranscriptPanel } from "@/components/dashboard/LiveTranscriptPanel";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -159,7 +159,7 @@ export default function CallMonitoringPage() {
                     <p className="text-sm text-slate-400 px-4 py-4">No events recorded</p>
                   ) : (
                     <ul className="divide-y max-h-64 overflow-y-auto">
-                      {events.map((ev: any) => (
+                      {events.map((ev: CallMonitoringEvent) => (
                         <li key={ev.id} className="px-4 py-2.5 flex items-start gap-3 text-xs">
                           <span className="text-slate-400 shrink-0 w-20">
                             {new Date(ev.recorded_at).toLocaleTimeString()}

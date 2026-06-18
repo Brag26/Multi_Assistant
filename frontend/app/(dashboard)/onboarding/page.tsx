@@ -150,7 +150,7 @@ export default function OnboardingPage() {
     ),
     workflow: (
       <div className="space-y-3">
-        <p className="text-sm text-slate-500">You're all set! Create your first voice automation workflow.</p>
+        <p className="text-sm text-slate-500">You&apos;re all set! Create your first voice automation workflow.</p>
         <Button onClick={() => router.push("/workflows")} className="gap-1.5">
           <Zap className="w-4 h-4" /> Open Workflow Builder
         </Button>
@@ -165,7 +165,7 @@ export default function OnboardingPage() {
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold">Welcome to VoiceOps</h1>
-          <p className="text-slate-500 mt-1">Let's get your platform set up in a few steps</p>
+          <p className="text-slate-500 mt-1">Let&apos;s get your platform set up in a few steps</p>
         </div>
 
         <div className="grid gap-3">
