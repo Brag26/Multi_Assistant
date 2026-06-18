@@ -7,7 +7,7 @@
 // still feeling "live" (1.5s granularity is imperceptible for transcript read-along).
 
 import { useEffect, useRef, useState } from "react";
-import { listCallEvents, type CallMonitoringEvent } from "@/lib/api";
+import { listCallEvents } from "@/lib/api";
 
 interface TranscriptChunk {
   speaker: "agent" | "customer" | "system";
