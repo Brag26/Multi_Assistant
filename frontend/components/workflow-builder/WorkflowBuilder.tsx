@@ -8,7 +8,6 @@
  * The component is self-contained so it can be dropped into any page.
  */
 import {
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -17,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Plus, Play, Pause, Copy, Download, Upload,
-  Save, RotateCcw, Trash2, X, Zap, GitBranch,
+  Save, Trash2, X, Zap, GitBranch,
   Clock, Webhook, Mail, PhoneCall, UserCheck,
   ArrowRightLeft, StickyNote, RefreshCw, StopCircle,
   Shuffle, Merge, GitMerge, Check,
@@ -89,7 +88,7 @@ function categoryBadge(category: string) {
   return                             { bg: "bg-purple-100", text: "text-purple-700", label: "LOGIC" };
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
+// ─── Props ───────────────────────────────────────────────────────────
 
 interface WorkflowBuilderProps {
   workflow: Workflow;
@@ -101,7 +100,7 @@ interface WorkflowBuilderProps {
   saving?: boolean;
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component ──────────────────────────────────────────────────────────
 
 export function WorkflowBuilder({
   workflow, onSave, onActivate, onClone, onExport, onImport, saving,
@@ -125,7 +124,7 @@ export function WorkflowBuilder({
     setEdges(workflow.edges ?? []);
   }, [workflow.id]);
 
-  // ── Port positions ─────────────────────────────────────────────────────────
+  // ── Port positions ────────────────────────────────────────────────────────
 
   const outPort = (n: WorkflowNode) => ({
     x: n.position.x + panOffset.x + NODE_W,
@@ -180,7 +179,7 @@ export function WorkflowBuilder({
     setPendingEdge(null);
   };
 
-  // ── Node drag ─────────────────────────────────────────────────────────────
+  // ── Node drag ───────────────────────────────────────────────────────────
 
   const onNodeMouseDown = (e: RMouseEvent, id: string) => {
     e.stopPropagation();
@@ -245,7 +244,7 @@ export function WorkflowBuilder({
     setShowPalette(false);
   };
 
-  // ── Import JSON ────────────────────────────────────────────────────────────
+  // ── Import JSON ─────────────────────────────────────────────────────────
 
   const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -314,9 +313,15 @@ export function WorkflowBuilder({
           <div className="w-56 bg-[#161b26] border-r border-slate-800 flex flex-col shrink-0 overflow-y-auto">
             <div className="flex border-b border-slate-800">
               {(["trigger", "action", "logic"] as const).map(t => (
-                <button key={t}
-                  className={`flex-1 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors ${paletteTab === t ? "text-white border-b-2 border-indigo-500" : "text-slate-500 hover:text-slate-300"}`}
-                  onClick={() => setPaletteTab(t)}>
+                <button
+                  key={t}
+                  className={`flex-1 py-2 text-[11px] font-semibold uppercase tracking-wide transition-colors ${
+                    paletteTab === t
+                      ? "text-white border-b-2 border-indigo-500"
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                  onClick={() => setPaletteTab(t)}
+                >
                   {t}
                 </button>
               ))}

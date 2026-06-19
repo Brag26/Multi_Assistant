@@ -243,11 +243,12 @@ async function authHeaders() {
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const isForm = init?.body instanceof FormData;
-  const headers = {
-    ...(isForm ? {} : { "Content-Type": "application/json" }),
-    ...(await authHeaders()),
-    ...init?.headers,
-  };
+  const headers = new Headers(init?.headers);
+  if (!isForm && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const { Authorization } = await authHeaders();
+  if (Authorization) headers.set("Authorization", Authorization);
   const response = await fetch(`${API_URL}${path}`, { ...init, headers });
   if (!response.ok) throw new Error(await response.text());
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);

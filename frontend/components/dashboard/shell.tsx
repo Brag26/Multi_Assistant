@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
+import type { LucideIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Workflow, PhoneCall, Users, Megaphone,
@@ -10,7 +12,18 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 
-const NAV_GROUPS = [
+interface NavItem {
+  href: Route;
+  label: string;
+  icon: LucideIcon;
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
   {
     label: "Overview",
     items: [
