@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       {
         cookies: {
           getAll: () => cookieStore.getAll(),
-          setAll: (cookiesToSet) =>
+          setAll: (cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) =>
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             ),
@@ -61,9 +61,7 @@ export async function GET(request: Request) {
           if (status === "rejected") {
             return NextResponse.redirect(new URL("/rejected", request.url));
           }
-          if (role === "super_admin") {
-            return NextResponse.redirect(new URL("/superadmin", request.url));
-          }
+          // superadmin goes to dashboard like everyone else
         }
       } catch {
         // Fall through to dashboard

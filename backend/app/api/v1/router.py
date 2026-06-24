@@ -1,7 +1,6 @@
 """api/v1/router.py — registers all sub-routers including new features."""
 from fastapi import APIRouter
 from app.api.v1.approval import router as approval_router
-router.include_router(approval_router)
 from app.api.v1 import (
     analytics,
     appointments,
@@ -35,6 +34,9 @@ from app.api.v1.outbound_webhooks import router as outbound_webhooks_router
 from app.api.v1.agent_performance import router as agent_performance_router
 
 api_router = APIRouter()
+
+# Approval / role system
+api_router.include_router(approval_router)
 
 # Existing routers
 api_router.include_router(workflows.router)

@@ -163,7 +163,18 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        <div className="text-center mb-8">
+        <div className="mb-4">
+  <button
+    onClick={() => router.push("/dashboard")}
+    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+  >
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    </svg>
+    Back to Dashboard
+  </button>
+</div>
+<div className="text-center mb-8">
           <h1 className="text-2xl font-semibold">Welcome to VoiceOps</h1>
           <p className="text-slate-500 mt-1">Let&apos;s get your platform set up in a few steps</p>
         </div>

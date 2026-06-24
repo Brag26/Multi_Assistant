@@ -35,7 +35,7 @@ export default function PendingPage() {
           pending approval from the administrator.
         </p>
         <p className="mt-2 text-sm text-slate-400">
-          You'll receive an email once your account has been reviewed. This usually takes less than 24 hours.
+          You&apos;ll receive an email once your account has been reviewed. This usually takes less than 24 hours.
         </p>
 
         <div className="mt-8 rounded-lg border border-slate-200 bg-white p-4 text-left">
