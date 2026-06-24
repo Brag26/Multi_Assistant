@@ -1,6 +1,7 @@
 """api/v1/router.py — registers all sub-routers including new features."""
 from fastapi import APIRouter
-
+from app.api.v1.approval import router as approval_router
+router.include_router(approval_router)
 from app.api.v1 import (
     analytics,
     appointments,

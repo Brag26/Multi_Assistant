@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Any
 
@@ -7,8 +7,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.infrastructure.db.session import get_session
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -46,7 +49,19 @@ async def _jwks() -> dict[str, Any]:
             _jwks_cache = response.json()
     return _jwks_cache
 
-async def verify_supabase_jwt(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)]) -> Principal:
+async def _lookup_membership(user_id: str, db: AsyncSession) -> tuple[str, str] | None:
+    """Look up tenant_id and role from memberships table."""
+    result = await db.execute(
+        text("SELECT tenant_id::text, role FROM memberships WHERE user_id = :uid LIMIT 1"),
+        {"uid": user_id},
+    )
+    row = result.fetchone()
+    return (str(row.tenant_id), row.role) if row else None
+
+async def verify_supabase_jwt(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    db: AsyncSession = Depends(get_session),
+) -> Principal:
     if credentials is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
 
@@ -61,11 +76,25 @@ async def verify_supabase_jwt(credentials: Annotated[HTTPAuthorizationCredential
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
 
     metadata = claims.get("app_metadata", {}) | claims.get("user_metadata", {})
-    role = Role(metadata.get("role", Role.VIEWER))
+    tenant_id: str | None = metadata.get("tenant_id")
+    role_str: str = metadata.get("role", "")
+
+    # Fall back to memberships table if JWT metadata is missing tenant_id or role
+    if not tenant_id or not role_str:
+        membership = await _lookup_membership(claims["sub"], db)
+        if membership:
+            tenant_id = tenant_id or membership[0]
+            role_str = role_str or membership[1]
+
+    try:
+        role = Role(role_str) if role_str else Role.VIEWER
+    except ValueError:
+        role = Role.VIEWER
+
     return Principal(
         user_id=claims["sub"],
         email=claims.get("email"),
-        tenant_id=metadata.get("tenant_id"),
+        tenant_id=tenant_id,
         role=role,
         claims=claims,
     )
