@@ -174,22 +174,37 @@ export function DashboardShell({ children }: Props) {
           ))}
 
           {/* Superadmin link */}
-          {userRole === "super_admin" && (
-            <div className="mb-4">
-              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                Superadmin
-              </p>
-              <Link href="/superadmin/approvals"
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  pathname.startsWith("/superadmin")
-                    ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}>
-                <ShieldCheck className="w-4 h-4 shrink-0 text-slate-400" />
-                User Approvals
-              </Link>
-            </div>
-          )}
+{userRole === "super_admin" && (
+  <div className="mb-4">
+    <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+      Superadmin
+    </p>
+
+    <Link
+      href="/superadmin/users"
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+        pathname.startsWith("/superadmin/users")
+          ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
+          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+      }`}
+    >
+      <Users className="w-4 h-4 shrink-0 text-slate-400" />
+      Manage Users
+    </Link>
+
+    <Link
+      href="/superadmin/approvals"
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+        pathname.startsWith("/superadmin/approvals")
+          ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
+          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+      }`}
+    >
+      <ShieldCheck className="w-4 h-4 shrink-0 text-slate-400" />
+      User Approvals
+    </Link>
+  </div>
+)}
         </nav>
 
         <Link href="/onboarding"

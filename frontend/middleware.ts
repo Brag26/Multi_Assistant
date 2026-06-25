@@ -11,6 +11,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/pending") ||
+    pathname.startsWith("/demo") ||
     pathname.startsWith("/rejected")
   ) {
     return NextResponse.next();

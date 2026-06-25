@@ -1,6 +1,7 @@
 """api/v1/router.py — registers all sub-routers including new features."""
 from fastapi import APIRouter
 from app.api.v1.approval import router as approval_router
+from app.api.v1.admin_users import router as admin_users_router
 from app.api.v1 import (
     analytics,
     appointments,
@@ -30,13 +31,15 @@ from app.api.v1.features import (
     scoring_router,
     slack_router,
 )
-from app.api.v1.admin_users import router as admin_users_router
-# then after api_router = APIRouter():
-api_router.include_router(admin_users_router)
+
+
 from app.api.v1.outbound_webhooks import router as outbound_webhooks_router
 from app.api.v1.agent_performance import router as agent_performance_router
 
 api_router = APIRouter()
+
+# then after api_router = APIRouter():
+api_router.include_router(admin_users_router)
 
 # Approval / role system
 api_router.include_router(approval_router)

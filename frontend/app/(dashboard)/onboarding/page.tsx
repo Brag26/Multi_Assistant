@@ -249,7 +249,7 @@ export default function OnboardingPage() {
     try {
       const fields = getFields(provider.id);
 
-      if (provider.oauthFlow) {
+      if ((provider as { oauthFlow?: boolean }).oauthFlow) {
         const redirectUri = `${window.location.origin}/integrations/calendar/callback`;
         const res = await getCalendarOAuthUrl(tenantId, redirectUri);
         window.location.href = res.url;
