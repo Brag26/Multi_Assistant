@@ -1,234 +1,483 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
-import { configureSlack, getSlackConfig, getCalendarOAuthUrl } from "@/lib/api-features";
-import { connectIntegration, listIntegrations } from "@/lib/api";
+import { connectIntegration } from "@/lib/api";
+import { configureSlack, getCalendarOAuthUrl } from "@/lib/api-features";
 import { useRouter } from "next/navigation";
-import { Check, ChevronRight, Phone, Webhook, Calendar, Bell, Zap, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Check, ChevronRight, Phone, Webhook, Calendar, Bell,
+  Zap, ArrowRight, ArrowLeft, ExternalLink, ChevronDown, ChevronUp,
+} from "lucide-react";
 
-const STEPS = [
-  { id: "vapi",     label: "Connect Vapi",        icon: Phone,    desc: "AI voice agent platform" },
-  { id: "twilio",   label: "Connect Twilio",       icon: Phone,    desc: "Phone number & telephony" },
-  { id: "make",     label: "Connect Make.com",     icon: Webhook,  desc: "Automation scenarios" },
-  { id: "slack",    label: "Set up Slack alerts",  icon: Bell,     desc: "Real-time notifications" },
-  { id: "calendar", label: "Connect Calendar",     icon: Calendar, desc: "Sync appointments" },
-  { id: "workflow", label: "Create first workflow", icon: Zap,     desc: "Build your automation" },
-];
+// ─── Integration catalogue ────────────────────────────────────────────────────
+
+const INTEGRATIONS = {
+  voiceai: {
+    label: "Voice AI",
+    emoji: "🤖",
+    color: "#6366f1",
+    providers: [
+      {
+        id: "vapi", name: "Vapi", tag: "Most Popular", recommended: true,
+        desc: "Best-in-class AI voice agent platform. Powers most production voice AI workflows.",
+        logo: "https://app.vapi.ai/favicon.ico",
+        docsUrl: "https://app.vapi.ai",
+        fields: [{ key: "api_key", label: "API Key", placeholder: "vapi_...", type: "password", hint: "app.vapi.ai → Account → API Keys" }],
+      },
+      {
+        id: "retell", name: "Retell AI", tag: "Alternative",
+        desc: "Developer-friendly AI voice platform with low-latency calls and custom LLM support.",
+        docsUrl: "https://app.retellai.com",
+        fields: [{ key: "api_key", label: "API Key", placeholder: "key_...", type: "password", hint: "app.retellai.com → API Keys" }],
+      },
+      {
+        id: "bland", name: "Bland AI", tag: "Budget Option",
+        desc: "Affordable AI calling platform. Great for high-volume outbound campaigns.",
+        docsUrl: "https://app.bland.ai",
+        fields: [{ key: "api_key", label: "API Key", placeholder: "sk-...", type: "password", hint: "app.bland.ai → Settings → API Key" }],
+      },
+    ],
+  },
+  telephony: {
+    label: "Telephony",
+    emoji: "📞",
+    color: "#0ea5e9",
+    providers: [
+      {
+        id: "twilio", name: "Twilio", tag: "Global Leader", recommended: true,
+        desc: "World's most popular CPaaS. Best for global reach and developer flexibility.",
+        docsUrl: "https://console.twilio.com",
+        fields: [
+          { key: "account_sid", label: "Account SID", placeholder: "ACxxxxxxxx", type: "text", hint: "console.twilio.com → Account Info" },
+          { key: "auth_token", label: "Auth Token", placeholder: "••••••••", type: "password", hint: "console.twilio.com → Account Info" },
+          { key: "phone_number", label: "Phone Number", placeholder: "+15550001234", type: "text", hint: "Twilio phone number in E.164 format" },
+        ],
+      },
+      {
+        id: "exotel", name: "Exotel", tag: "Best for India 🇮🇳", recommended: true,
+        desc: "India's #1 cloud telephony. Powers Ola, Swiggy, Flipkart. 70M+ daily calls. INR pricing.",
+        docsUrl: "https://my.exotel.com",
+        fields: [
+          { key: "api_key", label: "API Key", placeholder: "exotel_key_...", type: "password", hint: "my.exotel.com → Settings → API" },
+          { key: "api_token", label: "API Token", placeholder: "exotel_token_...", type: "password", hint: "my.exotel.com → Settings → API" },
+          { key: "account_sid", label: "Account SID / Subdomain", placeholder: "mycompany", type: "text", hint: "Your Exotel subdomain" },
+          { key: "phone_number", label: "Exotel Number", placeholder: "+91XXXXXXXXXX", type: "text", hint: "Your Exotel virtual number" },
+        ],
+      },
+      {
+        id: "msg91", name: "MSG91", tag: "India SMS & Voice 🇮🇳",
+        desc: "2.5B+ monthly API calls. Used by Razorpay, PolicyBazaar. Full DLT compliance built-in.",
+        docsUrl: "https://msg91.com",
+        fields: [
+          { key: "auth_key", label: "Auth Key", placeholder: "xxxxxxxx", type: "password", hint: "msg91.com → API → Auth Key" },
+          { key: "sender_id", label: "Sender ID", placeholder: "VOIOPS", type: "text", hint: "Your DLT registered Sender ID" },
+        ],
+      },
+      {
+        id: "plivo", name: "Plivo", tag: "30-46% Cheaper",
+        desc: "India-founded, global reach. 30–46% cheaper than Twilio. 190+ countries, 1600+ carriers.",
+        docsUrl: "https://console.plivo.com",
+        fields: [
+          { key: "auth_id", label: "Auth ID", placeholder: "MAXXXXXXXXXXXXXXXX", type: "text", hint: "console.plivo.com → Overview" },
+          { key: "auth_token", label: "Auth Token", placeholder: "••••••••", type: "password", hint: "console.plivo.com → Overview" },
+          { key: "phone_number", label: "Phone Number", placeholder: "+919XXXXXXXXX", type: "text", hint: "Your Plivo number" },
+        ],
+      },
+      {
+        id: "gupshup", name: "Gupshup", tag: "WhatsApp + Voice 🇮🇳",
+        desc: "India's leading WhatsApp Business API provider. Also supports voice. Enterprise-grade.",
+        docsUrl: "https://www.gupshup.io",
+        fields: [
+          { key: "api_key", label: "API Key", placeholder: "gs_...", type: "password", hint: "gupshup.io → Dashboard → API Key" },
+          { key: "app_name", label: "App Name", placeholder: "my-voiceops-app", type: "text", hint: "Your Gupshup app name" },
+        ],
+      },
+      {
+        id: "knowlarity", name: "Knowlarity", tag: "India Enterprise 🇮🇳",
+        desc: "Cloud telephony for Indian enterprises. IVR, virtual numbers, call routing.",
+        docsUrl: "https://www.knowlarity.com",
+        fields: [
+          { key: "api_key", label: "API Key", placeholder: "kn_...", type: "password", hint: "knowlarity.com → API Credentials" },
+          { key: "caller_id", label: "Caller ID / Number", placeholder: "+91XXXXXXXXXX", type: "text", hint: "Your Knowlarity virtual number" },
+        ],
+      },
+      {
+        id: "telnyx", name: "Telnyx", tag: "Developer Friendly",
+        desc: "Global CPaaS with competitive rates. Great WebRTC and SIP trunking support.",
+        docsUrl: "https://portal.telnyx.com",
+        fields: [
+          { key: "api_key", label: "API Key", placeholder: "KEY...", type: "password", hint: "portal.telnyx.com → API Keys" },
+          { key: "phone_number", label: "Phone Number", placeholder: "+15550001234", type: "text", hint: "Your Telnyx phone number" },
+        ],
+      },
+      {
+        id: "frejun", name: "FreJun", tag: "AI Voice India 🇮🇳",
+        desc: "Sub-250ms WebSocket streaming. Best for AI voice in India & UAE. Vapi/Retell compatible.",
+        docsUrl: "https://frejun.com",
+        fields: [
+          { key: "api_key", label: "API Key", placeholder: "fj_...", type: "password", hint: "frejun.com → Settings → API" },
+          { key: "phone_number", label: "Phone Number", placeholder: "+91XXXXXXXXXX", type: "text", hint: "Your FreJun number" },
+        ],
+      },
+    ],
+  },
+  automation: {
+    label: "Automation",
+    emoji: "⚡",
+    color: "#f59e0b",
+    providers: [
+      {
+        id: "make", name: "Make.com", tag: "Most Popular", recommended: true,
+        desc: "Visual automation platform. Connect 1000+ apps without coding.",
+        docsUrl: "https://make.com",
+        fields: [{ key: "webhook_url", label: "Webhook URL", placeholder: "https://hook.make.com/...", type: "text", hint: "make.com → Scenario → Webhooks → Copy URL" }],
+      },
+      {
+        id: "zapier", name: "Zapier", tag: "Easiest Setup",
+        desc: "The world's most popular automation tool. 5000+ app integrations.",
+        docsUrl: "https://zapier.com",
+        fields: [{ key: "webhook_url", label: "Webhook URL", placeholder: "https://hooks.zapier.com/...", type: "text", hint: "zapier.com → Zaps → Webhook → Copy URL" }],
+      },
+      {
+        id: "n8n", name: "n8n", tag: "Open Source",
+        desc: "Self-hostable automation. No per-task pricing. Full control over your data.",
+        docsUrl: "https://n8n.io",
+        fields: [{ key: "webhook_url", label: "Webhook URL", placeholder: "https://your-n8n.com/webhook/...", type: "text", hint: "n8n → Webhook node → Copy URL" }],
+      },
+    ],
+  },
+  crm: {
+    label: "CRM",
+    emoji: "👥",
+    color: "#10b981",
+    providers: [
+      {
+        id: "hubspot", name: "HubSpot", tag: "Most Popular",
+        desc: "World's #1 CRM. Sync contacts, deals, and call outcomes automatically.",
+        docsUrl: "https://app.hubspot.com",
+        fields: [{ key: "api_key", label: "Private App Token", placeholder: "pat-na1-...", type: "password", hint: "HubSpot → Settings → Integrations → Private Apps" }],
+      },
+      {
+        id: "zoho", name: "Zoho CRM", tag: "Popular in India 🇮🇳",
+        desc: "India's favourite CRM. Great pricing, deep customization, strong India support.",
+        docsUrl: "https://crm.zoho.in",
+        fields: [
+          { key: "client_id", label: "Client ID", placeholder: "1000.XXXXX", type: "text", hint: "Zoho API Console → Client ID" },
+          { key: "client_secret", label: "Client Secret", placeholder: "••••••••", type: "password", hint: "Zoho API Console → Client Secret" },
+          { key: "refresh_token", label: "Refresh Token", placeholder: "1000.XXXXX", type: "password", hint: "OAuth → Refresh Token" },
+        ],
+      },
+    ],
+  },
+  notifications: {
+    label: "Notifications",
+    emoji: "🔔",
+    color: "#8b5cf6",
+    providers: [
+      {
+        id: "slack", name: "Slack", tag: "Most Popular", recommended: true,
+        desc: "Real-time alerts for calls, leads, and appointments in your Slack workspace.",
+        docsUrl: "https://api.slack.com/apps",
+        fields: [
+          { key: "webhook_url", label: "Webhook URL", placeholder: "https://hooks.slack.com/services/...", type: "text", hint: "api.slack.com → Your App → Incoming Webhooks" },
+          { key: "channel", label: "Channel (optional)", placeholder: "#voice-ops", type: "text", hint: "Default Slack channel for alerts" },
+        ],
+      },
+      {
+        id: "whatsapp", name: "WhatsApp Business", tag: "India Preferred 🇮🇳",
+        desc: "Send call summaries and lead alerts directly to WhatsApp. Widely used in India.",
+        docsUrl: "https://business.whatsapp.com",
+        fields: [
+          { key: "api_key", label: "API Token", placeholder: "EAAxxxxxxx", type: "password", hint: "Meta Business → WhatsApp → API Token" },
+          { key: "phone_number_id", label: "Phone Number ID", placeholder: "1234567890", type: "text", hint: "Meta Business → WhatsApp → Phone Number ID" },
+        ],
+      },
+    ],
+  },
+  calendar: {
+    label: "Calendar",
+    emoji: "📅",
+    color: "#ec4899",
+    providers: [
+      {
+        id: "google_calendar", name: "Google Calendar", tag: "Most Popular", recommended: true,
+        desc: "Automatically sync booked appointments from voice calls to your Google Calendar.",
+        docsUrl: "https://calendar.google.com",
+        fields: [],
+        oauthFlow: true,
+      },
+      {
+        id: "calendly", name: "Calendly", tag: "Booking Flow",
+        desc: "Let callers book meetings directly. Sync Calendly events back to VoiceOps.",
+        docsUrl: "https://calendly.com",
+        fields: [{ key: "api_key", label: "Personal Access Token", placeholder: "eyJhbGci...", type: "password", hint: "calendly.com → Integrations → API & Webhooks" }],
+      },
+    ],
+  },
+};
+
+type FieldValues = Record<string, string>;
+type ConnectedMap = Record<string, boolean>;
+
+// ─── Component ─────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
   const router = useRouter();
   const tenantId = useSessionStore(s => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
-  const [currentStep, setCurrentStep] = useState(0);
-  const [completed, setCompleted] = useState<Set<string>>(new Set());
-  const [vapiKey, setVapiKey] = useState("");
-  const [twilioSid, setTwilioSid] = useState("");
-  const [twilioToken, setTwilioToken] = useState("");
-  const [twilioPhone, setTwilioPhone] = useState("");
-  const [makeUrl, setMakeUrl] = useState("");
-  const [slackUrl, setSlackUrl] = useState("");
-  const [slackChannel, setSlackChannel] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [connected, setConnected] = useState<ConnectedMap>({});
+  const [expanded, setExpanded] = useState<string | null>("vapi");
+  const [saving, setSaving] = useState<string | null>(null);
+  const [fieldValues, setFieldValues] = useState<Record<string, FieldValues>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [activeCategory, setActiveCategory] = useState<string>("voiceai");
 
-  const markDone = (id: string) => {
-    setCompleted(prev => new Set([...prev, id]));
-    if (currentStep < STEPS.length - 1) setCurrentStep(s => s + 1);
-  };
+  function getFields(providerId: string): FieldValues {
+    return fieldValues[providerId] ?? {};
+  }
 
-  const handleVapi = async () => {
-    setSaving(true);
+  function setField(providerId: string, key: string, value: string) {
+    setFieldValues(prev => ({
+      ...prev,
+      [providerId]: { ...(prev[providerId] ?? {}), [key]: value },
+    }));
+  }
+
+  async function handleConnect(categoryId: string, provider: typeof INTEGRATIONS.voiceai.providers[0]) {
+    setSaving(provider.id);
+    setErrors(prev => ({ ...prev, [provider.id]: "" }));
     try {
-      await connectIntegration(tenantId, "vapi", { api_key: vapiKey });
-      markDone("vapi");
-    } finally { setSaving(false); }
-  };
+      const fields = getFields(provider.id);
 
-  const handleTwilio = async () => {
-    setSaving(true);
-    try {
-      await connectIntegration(tenantId, "twilio", {
-        account_sid: twilioSid, auth_token: twilioToken, config: { phone: twilioPhone }
-      });
-      markDone("twilio");
-    } finally { setSaving(false); }
-  };
+      if (provider.oauthFlow) {
+        const redirectUri = `${window.location.origin}/integrations/calendar/callback`;
+        const res = await getCalendarOAuthUrl(tenantId, redirectUri);
+        window.location.href = res.url;
+        return;
+      }
 
-  const handleMake = async () => {
-    setSaving(true);
-    try {
-      await connectIntegration(tenantId, "make", { webhook_url: makeUrl });
-      markDone("make");
-    } finally { setSaving(false); }
-  };
+      // Map fields to provider-specific payload
+      let payload: Record<string, unknown> = { ...fields };
 
-  const handleSlack = async () => {
-    setSaving(true);
-    try {
-      await configureSlack(tenantId, { webhook_url: slackUrl, channel: slackChannel });
-      markDone("slack");
-    } finally { setSaving(false); }
-  };
+      if (provider.id === "slack") {
+        const { configureSlack: configureSl } = await import("@/lib/api-features");
+        await configureSl(tenantId, { webhook_url: fields.webhook_url, channel: fields.channel });
+      } else if (provider.id === "twilio") {
+        payload = {
+          account_sid: fields.account_sid,
+          auth_token: fields.auth_token,
+          config: { phone: fields.phone_number },
+        };
+        await connectIntegration(tenantId, "twilio", payload);
+      } else {
+        await connectIntegration(tenantId, provider.id, payload);
+      }
 
-  const handleCalendar = async () => {
-    const redirectUri = `${window.location.origin}/integrations/calendar/callback`;
-    const res = await getCalendarOAuthUrl(tenantId, redirectUri);
-    window.location.href = res.url;
-  };
+      setConnected(prev => ({ ...prev, [provider.id]: true }));
+      setExpanded(null);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Connection failed";
+      setErrors(prev => ({ ...prev, [provider.id]: msg }));
+    } finally {
+      setSaving(null);
+    }
+  }
 
-  const stepContent: Record<string, React.ReactNode> = {
-    vapi: (
-      <div className="space-y-3">
-        <p className="text-sm text-slate-500">Paste your Vapi API key from <a href="https://app.vapi.ai" target="_blank" className="text-blue-600 underline">app.vapi.ai</a> → Account → API Keys</p>
-        <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="vapi_..." value={vapiKey} onChange={e => setVapiKey(e.target.value)} />
-        <div className="flex gap-2">
-          <Button onClick={handleVapi} disabled={!vapiKey || saving} className="gap-1.5">
-            {saving ? "Saving…" : "Connect Vapi"} <ArrowRight className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" onClick={() => markDone("vapi")}>Skip for now</Button>
-        </div>
-      </div>
-    ),
-    twilio: (
-      <div className="space-y-3">
-        <p className="text-sm text-slate-500">From <a href="https://console.twilio.com" target="_blank" className="text-blue-600 underline">console.twilio.com</a> → Account Info</p>
-        <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Account SID: ACxxxx..." value={twilioSid} onChange={e => setTwilioSid(e.target.value)} />
-        <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Auth Token" type="password" value={twilioToken} onChange={e => setTwilioToken(e.target.value)} />
-        <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Phone number: +15550001234" value={twilioPhone} onChange={e => setTwilioPhone(e.target.value)} />
-        <div className="flex gap-2">
-          <Button onClick={handleTwilio} disabled={!twilioSid || saving} className="gap-1.5">
-            {saving ? "Saving…" : "Connect Twilio"} <ArrowRight className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" onClick={() => markDone("twilio")}>Skip</Button>
-        </div>
-      </div>
-    ),
-    make: (
-      <div className="space-y-3">
-        <p className="text-sm text-slate-500">From <a href="https://make.com" target="_blank" className="text-blue-600 underline">make.com</a> → create a scenario → add Webhooks module → copy URL</p>
-        <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="https://hook.make.com/..." value={makeUrl} onChange={e => setMakeUrl(e.target.value)} />
-        <div className="flex gap-2">
-          <Button onClick={handleMake} disabled={!makeUrl || saving} className="gap-1.5">
-            {saving ? "Saving…" : "Connect Make.com"} <ArrowRight className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" onClick={() => markDone("make")}>Skip</Button>
-        </div>
-      </div>
-    ),
-    slack: (
-      <div className="space-y-3">
-        <p className="text-sm text-slate-500">From your Slack workspace → Apps → Incoming Webhooks → Add New Webhook</p>
-        <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="https://hooks.slack.com/services/..." value={slackUrl} onChange={e => setSlackUrl(e.target.value)} />
-        <input className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Channel: #voice-ops (optional)" value={slackChannel} onChange={e => setSlackChannel(e.target.value)} />
-        <div className="flex gap-2">
-          <Button onClick={handleSlack} disabled={!slackUrl || saving} className="gap-1.5">
-            {saving ? "Saving…" : "Connect Slack"} <ArrowRight className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" onClick={() => markDone("slack")}>Skip</Button>
-        </div>
-      </div>
-    ),
-    calendar: (
-      <div className="space-y-3">
-        <p className="text-sm text-slate-500">Connect Google Calendar to automatically sync booked appointments.</p>
-        <div className="flex gap-2">
-          <Button onClick={handleCalendar} className="gap-1.5">
-            <Calendar className="w-4 h-4" /> Connect Google Calendar
-          </Button>
-          <Button variant="ghost" onClick={() => markDone("calendar")}>Skip</Button>
-        </div>
-      </div>
-    ),
-    workflow: (
-      <div className="space-y-3">
-        <p className="text-sm text-slate-500">You&apos;re all set! Create your first voice automation workflow.</p>
-        <Button onClick={() => router.push("/workflows")} className="gap-1.5">
-          <Zap className="w-4 h-4" /> Open Workflow Builder
-        </Button>
-      </div>
-    ),
-  };
-
-  const allDone = completed.size >= STEPS.length - 1;
+  const categories = Object.entries(INTEGRATIONS);
+  const totalConnected = Object.values(connected).filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        <div className="mb-4">
-  <button
-    onClick={() => router.push("/dashboard")}
-    className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-  >
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-    </svg>
-    Back to Dashboard
-  </button>
-</div>
-<div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold">Welcome to VoiceOps</h1>
-          <p className="text-slate-500 mt-1">Let&apos;s get your platform set up in a few steps</p>
+    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.push("/dashboard")}
+              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+              <ArrowLeft className="w-4 h-4" /> Dashboard
+            </button>
+            <span className="text-slate-300">/</span>
+            <span className="text-sm font-medium text-slate-700">Setup Wizard</span>
+          </div>
+          {totalConnected > 0 && (
+            <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+              <Check className="w-3.5 h-3.5" />
+              {totalConnected} connected
+            </div>
+          )}
         </div>
 
-        <div className="grid gap-3">
-          {STEPS.map((step, i) => {
-            const Icon = step.icon;
-            const done = completed.has(step.id);
-            const active = currentStep === i;
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-800">Connect your tools</h1>
+          <p className="mt-1 text-slate-500">Set up your integrations to power your AI voice operations platform.</p>
+        </div>
 
+        {/* Category tabs */}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {categories.map(([catId, cat]) => {
+            const catConnected = cat.providers.filter(p => connected[p.id]).length;
             return (
-              <Card key={step.id}
-                className={`transition-all ${active ? "border-blue-400 shadow-sm" : done ? "opacity-70" : ""}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                      done ? "bg-emerald-100" : active ? "bg-blue-100" : "bg-slate-100"
-                    }`}>
-                      {done
-                        ? <Check className="w-4 h-4 text-emerald-600" />
-                        : <Icon className={`w-4 h-4 ${active ? "text-blue-600" : "text-slate-400"}`} />
-                      }
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className={`font-medium text-sm ${done ? "line-through text-slate-400" : ""}`}>{step.label}</p>
-                          <p className="text-xs text-slate-400">{step.desc}</p>
-                        </div>
-                        {!active && !done && (
-                          <Button size="sm" variant="ghost" className="h-7 text-xs"
-                            onClick={() => setCurrentStep(i)}>
-                            Set up <ChevronRight className="w-3 h-3 ml-0.5" />
-                          </Button>
-                        )}
-                      </div>
-                      {active && (
-                        <div className="mt-3">{stepContent[step.id]}</div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <button key={catId}
+                onClick={() => setActiveCategory(catId)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  activeCategory === catId
+                    ? "text-white shadow-sm"
+                    : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300"
+                }`}
+                style={activeCategory === catId ? { background: cat.color } : {}}>
+                <span>{cat.emoji}</span>
+                {cat.label}
+                {catConnected > 0 && (
+                  <span className={`text-xs rounded-full px-1.5 ${activeCategory === catId ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700"}`}>
+                    {catConnected}
+                  </span>
+                )}
+              </button>
             );
           })}
         </div>
 
-        {allDone && (
-          <div className="mt-6 text-center">
-            <Button size="lg" onClick={() => router.push("/dashboard")} className="gap-2">
-              Go to Dashboard <ArrowRight className="w-4 h-4" />
-            </Button>
+        {/* Providers for active category */}
+        {categories.filter(([catId]) => catId === activeCategory).map(([catId, cat]) => (
+          <div key={catId} className="space-y-3">
+            {cat.providers.map(provider => {
+              const isConnected = connected[provider.id];
+              const isExpanded = expanded === provider.id;
+              const isSaving = saving === provider.id;
+              const fields = getFields(provider.id);
+              const hasError = errors[provider.id];
+
+              return (
+                <div key={provider.id}
+                  className={`bg-white rounded-xl border transition-all ${
+                    isConnected ? "border-emerald-200 bg-emerald-50/30" :
+                    isExpanded ? "border-indigo-300 shadow-sm" : "border-slate-200 hover:border-slate-300"
+                  }`}>
+
+                  {/* Provider header */}
+                  <div className="flex items-center gap-4 p-4 cursor-pointer"
+                    onClick={() => !isConnected && setExpanded(isExpanded ? null : provider.id)}>
+                    {/* Icon placeholder */}
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
+                      style={{ background: `${cat.color}15`, border: `1px solid ${cat.color}30` }}>
+                      {cat.emoji}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-slate-800 text-sm">{provider.name}</span>
+                        {provider.tag && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                            style={{
+                              background: provider.recommended ? `${cat.color}15` : "#f1f5f9",
+                              color: provider.recommended ? cat.color : "#64748b",
+                            }}>
+                            {provider.tag}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5 truncate">{provider.desc}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isConnected ? (
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2.5 py-1">
+                          <Check className="w-3.5 h-3.5" /> Connected
+                        </div>
+                      ) : (
+                        <>
+                          <a href={provider.docsUrl} target="_blank" rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                          {isExpanded
+                            ? <ChevronUp className="w-4 h-4 text-slate-400" />
+                            : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded form */}
+                  {isExpanded && !isConnected && (
+                    <div className="px-4 pb-4 border-t border-slate-100 pt-4">
+                      {provider.oauthFlow ? (
+                        <div className="space-y-3">
+                          <p className="text-sm text-slate-500">Click below to authorize via Google OAuth. You&apos;ll be redirected back automatically.</p>
+                          <button
+                            onClick={() => handleConnect(catId, provider)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all"
+                            style={{ background: cat.color }}>
+                            <Calendar className="w-4 h-4" /> Connect Google Calendar
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {provider.fields.map(field => (
+                            <div key={field.key}>
+                              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                                {field.label}
+                              </label>
+                              <input
+                                type={field.type}
+                                placeholder={field.placeholder}
+                                value={fields[field.key] ?? ""}
+                                onChange={e => setField(provider.id, field.key, e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all bg-slate-50"
+                              />
+                              {field.hint && (
+                                <p className="text-xs text-slate-400 mt-1">📍 {field.hint}</p>
+                              )}
+                            </div>
+                          ))}
+
+                          {hasError && (
+                            <div className="rounded-lg px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-100">
+                              {hasError}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={() => handleConnect(catId, provider)}
+                              disabled={isSaving || provider.fields.some(f => !fields[f.key])}
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50"
+                              style={{ background: cat.color }}>
+                              {isSaving ? "Connecting..." : `Connect ${provider.name}`}
+                              {!isSaving && <ArrowRight className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              onClick={() => { setConnected(prev => ({ ...prev, [provider.id]: true })); setExpanded(null); }}
+                              className="px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                              Skip for now
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
+        ))}
+
+        {/* Footer */}
+        <div className="mt-8 flex items-center justify-between pt-4 border-t border-slate-200">
+          <p className="text-sm text-slate-500">
+            {totalConnected === 0
+              ? "Connect at least one Voice AI and one Telephony provider to get started"
+              : `${totalConnected} integration${totalConnected > 1 ? "s" : ""} connected — you're ready to build!`}
+          </p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all"
+            style={{ background: "linear-gradient(135deg, #6366f1, #7c3aed)" }}>
+            Go to Dashboard <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

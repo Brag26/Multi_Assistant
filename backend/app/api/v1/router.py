@@ -30,6 +30,9 @@ from app.api.v1.features import (
     scoring_router,
     slack_router,
 )
+from app.api.v1.admin_users import router as admin_users_router
+# then after api_router = APIRouter():
+api_router.include_router(admin_users_router)
 from app.api.v1.outbound_webhooks import router as outbound_webhooks_router
 from app.api.v1.agent_performance import router as agent_performance_router
 
