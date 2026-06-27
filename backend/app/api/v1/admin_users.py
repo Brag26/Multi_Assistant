@@ -1,5 +1,10 @@
 """
-api/v1/admin_users.py — Superadmin user management: create resellers & clients.
+api/v1/admin_users.py — User management for Superadmin and Resellers.
+
+Rules:
+- Superadmin: full access, sees all users, can create resellers + clients
+- Reseller: can create/delete only their own clients, cannot see other resellers or superadmin accounts
+- Import data: only superadmin can view imported files
 """
 import os
 import httpx
@@ -13,6 +18,7 @@ from app.infrastructure.db.session import get_session
 router = APIRouter(prefix="/admin/users", tags=["admin-users"])
 
 SuperAdmin = require_role(Role.SUPER_ADMIN)
+ResellerOrAbove = require_role(Role.TENANT_ADMIN)  # tenant_admin = reseller
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -40,26 +46,68 @@ async def create_supabase_user(email: str, password: str, display_name: str) -> 
         return res.json()["id"]
 
 
+async def delete_supabase_user(user_id: str) -> None:
+    """Delete a user from Supabase Auth using service role key."""
+    async with httpx.AsyncClient() as client:
+        await client.delete(
+            f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+            headers={
+                "apikey": SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+            },
+        )
+
+
 @router.get("")
 async def list_users(
-    user=Depends(SuperAdmin),
+    user: CurrentUser,
     db: AsyncSession = Depends(get_session),
 ):
-    """List all users with their roles. Superadmin only."""
-    result = await db.execute(
-        text("""
-            SELECT
-                m.user_id::text as id,
-                m.email,
-                m.display_name,
-                m.role,
-                m.status,
-                m.created_at,
-                m.tenant_id::text
-            FROM memberships m
-            ORDER BY m.created_at DESC
-        """)
-    )
+    """
+    List users based on role:
+    - Superadmin: sees ALL users
+    - Reseller: sees only their own created clients (created_by = reseller's user_id)
+    """
+    if user.role == Role.SUPER_ADMIN:
+        # Superadmin sees everything
+        result = await db.execute(
+            text("""
+                SELECT
+                    m.user_id::text as id,
+                    m.email,
+                    m.display_name,
+                    m.role,
+                    m.status,
+                    m.created_at,
+                    m.tenant_id::text,
+                    m.created_by::text
+                FROM memberships m
+                ORDER BY m.created_at DESC
+            """)
+        )
+    elif user.role == Role.TENANT_ADMIN:
+        # Reseller sees only clients they created
+        result = await db.execute(
+            text("""
+                SELECT
+                    m.user_id::text as id,
+                    m.email,
+                    m.display_name,
+                    m.role,
+                    m.status,
+                    m.created_at,
+                    m.tenant_id::text,
+                    m.created_by::text
+                FROM memberships m
+                WHERE m.created_by = :creator_id
+                  AND m.role = 'agent'
+                ORDER BY m.created_at DESC
+            """),
+            {"creator_id": user.user_id},
+        )
+    else:
+        raise HTTPException(status_code=403, detail="Insufficient role")
+
     rows = result.mappings().all()
     return [dict(r) for r in rows]
 
@@ -67,10 +115,17 @@ async def list_users(
 @router.post("")
 async def create_user(
     body: dict,
-    user=Depends(SuperAdmin),
+    user: CurrentUser,
     db: AsyncSession = Depends(get_session),
 ):
-    """Create a new reseller or client user. Superadmin only."""
+    """
+    Create a user:
+    - Superadmin: can create resellers, clients, managers, viewers
+    - Reseller: can only create clients (agents)
+    """
+    if user.role not in (Role.SUPER_ADMIN, Role.TENANT_ADMIN):
+        raise HTTPException(status_code=403, detail="Insufficient role")
+
     email = body.get("email", "").strip()
     password = body.get("password", "")
     display_name = body.get("display_name", email)
@@ -82,9 +137,18 @@ async def create_user(
     if len(password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
+    # Reseller can only create clients
+    if user.role == Role.TENANT_ADMIN:
+        if role != "agent":
+            raise HTTPException(status_code=403, detail="Resellers can only create client accounts")
+
+    # Superadmin cannot be created by reseller
+    if role == "super_admin" and user.role != Role.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Only superadmin can create superadmin accounts")
+
     valid_roles = ["super_admin", "tenant_admin", "manager", "agent", "viewer"]
     if role not in valid_roles:
-        raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {valid_roles}")
+        raise HTTPException(status_code=400, detail=f"Invalid role")
 
     # Check if email already exists
     existing = await db.execute(
@@ -108,13 +172,13 @@ async def create_user(
     # Create user in Supabase Auth
     new_user_id = await create_supabase_user(email, password, display_name)
 
-    # Create membership (auto-approved since superadmin created it)
+    # Create membership — track who created this user via created_by
     await db.execute(
         text("""
             INSERT INTO memberships
-              (tenant_id, user_id, email, role, status, display_name, approved_by, approved_at)
+              (tenant_id, user_id, email, role, status, display_name, approved_by, approved_at, created_by)
             VALUES
-              (:tenant_id, :user_id, :email, :role, 'approved', :display_name, :approver, now())
+              (:tenant_id, :user_id, :email, :role, 'approved', :display_name, :approver, now(), :creator)
         """),
         {
             "tenant_id": tenant_id,
@@ -123,6 +187,7 @@ async def create_user(
             "role": role,
             "display_name": display_name,
             "approver": user.user_id,
+            "creator": user.user_id,
         },
     )
 
@@ -169,16 +234,80 @@ async def update_user_role(
     return {"message": "Role updated"}
 
 
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: str,
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Delete a user:
+    - Superadmin: can delete anyone
+    - Reseller: can only delete their own clients
+    """
+    if user.role not in (Role.SUPER_ADMIN, Role.TENANT_ADMIN):
+        raise HTTPException(status_code=403, detail="Insufficient role")
+
+    # Check the target user exists
+    result = await db.execute(
+        text("SELECT user_id, role, created_by::text FROM memberships WHERE user_id = :uid LIMIT 1"),
+        {"uid": user_id},
+    )
+    target = result.mappings().fetchone()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Reseller can only delete their own clients
+    if user.role == Role.TENANT_ADMIN:
+        if target["created_by"] != user.user_id:
+            raise HTTPException(status_code=403, detail="You can only delete clients you created")
+        if target["role"] != "agent":
+            raise HTTPException(status_code=403, detail="Resellers can only delete client accounts")
+
+    # Prevent deleting superadmin
+    if target["role"] == "super_admin" and user.role != Role.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot delete superadmin account")
+
+    # Delete from Supabase Auth
+    await delete_supabase_user(user_id)
+
+    # Delete from memberships
+    await db.execute(
+        text("DELETE FROM memberships WHERE user_id = :uid"),
+        {"uid": user_id},
+    )
+    await db.commit()
+    return {"message": "User deleted successfully"}
+
+
 @router.post("/{user_id}/deactivate")
 async def deactivate_user(
     user_id: str,
     user=Depends(SuperAdmin),
     db: AsyncSession = Depends(get_session),
 ):
-    """Deactivate a user (set status to rejected). Superadmin only."""
+    """Deactivate a user. Superadmin only."""
     await db.execute(
         text("UPDATE memberships SET status = 'rejected', updated_at = now() WHERE user_id = :uid"),
         {"uid": user_id},
     )
     await db.commit()
     return {"message": "User deactivated"}
+
+
+@router.get("/imports/files")
+async def list_imported_files(
+    user=Depends(SuperAdmin),
+    db: AsyncSession = Depends(get_session),
+):
+    """List all imported files. Superadmin only."""
+    result = await db.execute(
+        text("""
+            SELECT id, tenant_id::text, file_name, file_type, status, created_at
+            FROM import_logs
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+    )
+    rows = result.mappings().all()
+    return [dict(r) for r in rows]

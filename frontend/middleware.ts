@@ -12,7 +12,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/pending") ||
     pathname.startsWith("/demo") ||
-    pathname.startsWith("/rejected")
+    pathname.startsWith("/rejected") ||
+    pathname.startsWith("/reset-password")
   ) {
     return NextResponse.next();
   }
