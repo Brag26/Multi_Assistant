@@ -206,7 +206,7 @@ export default function WorkflowTemplatesPage() {
         name: selectedTemplate.name,
         description: selectedTemplate.desc,
         status: "draft" as const,
-        trigger_type: selectedTemplate.nodes[0]?.data?.trigger_type ?? "campaign_start",
+        trigger_type: (selectedTemplate.nodes[0]?.data?.trigger_type ?? "campaign_start") as never,
         nodes: selectedTemplate.nodes as never,
         edges: selectedTemplate.edges as never,
         config: { template_id: selectedTemplate.id },

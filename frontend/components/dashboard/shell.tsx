@@ -10,7 +10,7 @@ import {
   Plug, CalendarCheck, Bell, BarChart2, Shield, Activity,
   TrendingUp, ShieldOff, Webhook, Trophy, FileBarChart,
   Sun, Moon, Sparkles, LogOut, Settings, User, ChevronUp,
-  ShieldCheck,
+  ShieldCheck, Zap, Mic,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
@@ -41,6 +41,8 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/workflows",  label: "Workflows",    icon: Workflow },
       { href: "/monitoring", label: "Call Monitor", icon: Activity },
       { href: "/webhooks",   label: "Webhooks",     icon: Webhook },
+      { href: "/workflows/templates", label: "Templates", icon: Zap },
+      { href: "/agents", label: "AI Agents", icon: Mic },
     ],
   },
   {
