@@ -5,6 +5,7 @@ import { useSessionStore } from "@/store/session";
 import { connectIntegration } from "@/lib/api";
 import { getCalendarOAuthUrl } from "@/lib/api-features";
 import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   Check, Calendar, Zap, ArrowRight, ArrowLeft, ExternalLink, ChevronDown, ChevronUp,
 } from "lucide-react";
@@ -92,7 +93,25 @@ export default function OnboardingPage() {
   const [fieldValues, setFieldValues] = useState<Record<string, FieldValues>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeCategory, setActiveCategory] = useState<string>("voiceai");
+  const [loading, setLoading] = useState(true);
 
+// Load saved integrations on mount
+useEffect(() => {
+  if (!tenantId) return;
+  import("@/lib/api").then(({ listIntegrations }) => {
+    listIntegrations(tenantId)
+      .then(integrations => {
+        const map: ConnectedMap = {};
+        integrations.forEach((i: { provider: string }) => {
+          map[i.provider] = true;
+        });
+        setConnected(map);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  });
+}, [tenantId]);
+  
   function getFields(providerId: string): FieldValues { return fieldValues[providerId] ?? {}; }
   function setField(providerId: string, key: string, value: string) {
     setFieldValues(prev => ({ ...prev, [providerId]: { ...(prev[providerId] ?? {}), [key]: value } }));
