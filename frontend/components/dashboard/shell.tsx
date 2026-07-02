@@ -142,7 +142,7 @@ export function DashboardShell({ children }: Props) {
           </button>
         </div>
 
-                {/* Nav */}
+        {/* Nav */}
         <nav className="flex-1 px-2 py-3 overflow-y-auto min-h-0">
           {NAV_GROUPS.map((group) => (
             <div key={group.label} className="mb-4">
@@ -294,3 +294,6 @@ export function DashboardShell({ children }: Props) {
           {children}
         </div>
       </main>
+    </div>
+  );
+}
