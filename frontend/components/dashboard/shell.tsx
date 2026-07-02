@@ -195,11 +195,11 @@ export function DashboardShell({ children }: Props) {
               </Link>
                       )}
         </div>
-      </nav>
+        </nav>
 
-      </aside>
+        </aside>
 
-      <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto">
         )}
 
         {/* Setup wizard */}
