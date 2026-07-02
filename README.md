@@ -1,4 +1,4 @@
-# VoiceOps AI — Multi-Assistant Platform
+# Volant AI — Multi-Assistant Platform
 
 An AI-powered voice operations platform for managing outbound/inbound call workflows, lead tracking, CRM, and real-time monitoring.
 
