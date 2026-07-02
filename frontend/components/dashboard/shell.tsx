@@ -193,8 +193,13 @@ export function DashboardShell({ children }: Props) {
                 <ShieldCheck className="w-4 h-4 shrink-0 text-slate-400" />
                 User Approvals
               </Link>
-            )}
-          </div>
+                      )}
+        </div>
+      </nav>
+
+      </aside>
+
+      <main className="flex-1 overflow-y-auto">
         )}
 
         {/* Setup wizard */}
