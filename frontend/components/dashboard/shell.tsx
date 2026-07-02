@@ -85,17 +85,30 @@ export function DashboardShell({ children }: Props) {
     });
     supabase.auth.getSession().then(async ({ data }) => {
       const token = data.session?.access_token;
-      if (!token) return;
+      console.log("[shell] API_URL:", process.env.NEXT_PUBLIC_API_URL);
+      console.log("[shell] token present:", !!token);
+      if (!token) {
+        console.warn("[shell] no session token — role fetch skipped");
+        return;
+      }
       try {
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        const url = `${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`;
+        console.log("[shell] fetching:", url);
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        console.log("[shell] status fetch response:", res.status);
         if (res.ok) {
           const { role } = await res.json();
+          console.log("[shell] role received:", role);
           setUserRole(role ?? "");
+        } else {
+          const text = await res.text();
+          console.error("[shell] status fetch failed:", res.status, text);
         }
-      } catch {}
+      } catch (err) {
+        console.error("[shell] status fetch threw:", err);
+      }
     });
   }, []);
 
