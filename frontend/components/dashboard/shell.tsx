@@ -194,7 +194,7 @@ export function DashboardShell({ children }: Props) {
                 User Approvals
               </Link>
                       )}
-        </div>
+           </div>
         </nav>
 
         </aside>
