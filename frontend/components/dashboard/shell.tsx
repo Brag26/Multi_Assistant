@@ -142,24 +142,37 @@ export function DashboardShell({ children }: Props) {
           </button>
         </div>
 
-        {/* Nav */}
+                {/* Nav */}
         <nav className="flex-1 px-2 py-3 overflow-y-auto min-h-0">
-          {NAV_GROUPS.map(group => (
+          {NAV_GROUPS.map((group) => (
             <div key={group.label} className="mb-4">
               <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 {group.label}
               </p>
+
               <div className="space-y-0.5">
-                {group.items.map(item => {
-                  const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                {group.items.map((item) => {
+                  const active =
+                    pathname === item.href ||
+                    pathname.startsWith(item.href + "/");
+
                   return (
-                    <Link key={item.href} href={item.href}
+                    <Link
+                      key={item.href}
+                      href={item.href}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                         active
                           ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
                           : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
-                      }`}>
-                      <item.icon className={`w-4 h-4 shrink-0 ${active ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`} />
+                      }`}
+                    >
+                      <item.icon
+                        className={`w-4 h-4 shrink-0 ${
+                          active
+                            ? "text-indigo-600 dark:text-indigo-400"
+                            : "text-slate-400"
+                        }`}
+                      />
                       {item.label}
                     </Link>
                   );
@@ -168,78 +181,112 @@ export function DashboardShell({ children }: Props) {
             </div>
           ))}
 
-          {/* Role-based admin section - fixed at bottom */}
-        {(isSuperAdmin || isReseller) && (
-          <div className="px-2 pb-2 border-t border-slate-100 dark:border-slate-800 pt-2 shrink-0">
-            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              {isSuperAdmin ? "Superadmin" : "My Account"}
-            </p>
-            <Link href="/superadmin/users"
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                pathname.startsWith("/superadmin/users")
-                  ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 font-medium"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-              }`}>
-              <Users className="w-4 h-4 shrink-0 text-slate-400" />
-              {isSuperAdmin ? "Manage Users" : "My Clients"}
-            </Link>
-            {isSuperAdmin && (
-              <Link href="/superadmin/approvals"
+          {/* Role-based admin section */}
+          {(isSuperAdmin || isReseller) && (
+            <div className="px-2 pb-2 border-t border-slate-100 dark:border-slate-800 pt-2 shrink-0">
+              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                {isSuperAdmin ? "Superadmin" : "My Account"}
+              </p>
+
+              <Link
+                href="/superadmin/users"
                 className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  pathname.startsWith("/superadmin/approvals")
+                  pathname.startsWith("/superadmin/users")
                     ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 font-medium"
                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}>
-                <ShieldCheck className="w-4 h-4 shrink-0 text-slate-400" />
-                User Approvals
+                }`}
+              >
+                <Users className="w-4 h-4 shrink-0 text-slate-400" />
+                {isSuperAdmin ? "Manage Users" : "My Clients"}
               </Link>
-                      )}
-           </div>
-        </nav>
 
-        </aside>
-
-        <main className="flex-1 overflow-y-auto">
-        )}
-
-        {/* Setup wizard */}
-        <Link href="/onboarding"
-          className="m-2 flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950 dark:to-blue-950 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity shrink-0">
-          <Sparkles className="w-4 h-4" /> Setup wizard
-        </Link>
-
-        {/* User menu */}
-        <div className="relative border-t border-slate-100 dark:border-slate-800 shrink-0" ref={menuRef}>
-          <button onClick={() => setMenuOpen(!menuOpen)}
-            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
-              {initials}
-            </div>
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">{userEmail}</p>
-              <p className="text-[10px] text-slate-400">{roleLabel[userRole] ?? "User"}</p>
-            </div>
-            <ChevronUp className={`w-4 h-4 text-slate-400 transition-transform ${menuOpen ? "" : "rotate-180"}`} />
-          </button>
-
-          {menuOpen && (
-            <div className="absolute bottom-full left-2 right-2 mb-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-50">
-              <Link href="/integrations" onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <Settings className="w-4 h-4" /> Settings
-              </Link>
-              <Link href="/onboarding" onClick={() => setMenuOpen(false)}
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-                <User className="w-4 h-4" /> Profile / Setup
-              </Link>
-              <div className="border-t border-slate-100 dark:border-slate-800" />
-              <button onClick={handleSignOut}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950">
-                <LogOut className="w-4 h-4" /> Sign out
-              </button>
+              {isSuperAdmin && (
+                <Link
+                  href="/superadmin/approvals"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    pathname.startsWith("/superadmin/approvals")
+                      ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 font-medium"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4 shrink-0 text-slate-400" />
+                  User Approvals
+                </Link>
+              )}
             </div>
           )}
-        </div>
+
+          {/* Setup wizard */}
+          <Link
+            href="/onboarding"
+            className="m-2 flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950 dark:to-blue-950 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity shrink-0"
+          >
+            <Sparkles className="w-4 h-4" />
+            Setup wizard
+          </Link>
+
+          {/* User menu */}
+          <div
+            className="relative border-t border-slate-100 dark:border-slate-800 shrink-0"
+            ref={menuRef}
+          >
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-semibold shrink-0">
+                {initials}
+              </div>
+
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+                  {userEmail}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {roleLabel[userRole] ?? "User"}
+                </p>
+              </div>
+
+              <ChevronUp
+                className={`w-4 h-4 text-slate-400 transition-transform ${
+                  menuOpen ? "" : "rotate-180"
+                }`}
+              />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute bottom-full left-2 right-2 mb-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden z-50">
+                <Link
+                  href="/integrations"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </Link>
+
+                <Link
+                  href="/onboarding"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <User className="w-4 h-4" />
+                  Profile / Setup
+                </Link>
+
+                <div className="border-t border-slate-100 dark:border-slate-800" />
+
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        </nav>
       </aside>
 
       <main className="flex-1 overflow-y-auto">
@@ -247,6 +294,3 @@ export function DashboardShell({ children }: Props) {
           {children}
         </div>
       </main>
-    </div>
-  );
-}
