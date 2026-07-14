@@ -149,7 +149,7 @@ class CallService:
         if wf is None or wf.vapi_assistant_id is None:
             raise HTTPException(status_code=400, detail="Workflow is not launchable")
         call = await self.calls.create_queued(
-            tenant_id, workflow_id, request, assistant_id=wf.vapi_assistant_id
+            tenant_id, workflow_id, request, assistant_id=wf.vapi_assistant_id, initiated_by_user_id=user.user_id
         )
         provider_call_id = await self.vapi.start_call(
             request.customer_phone, wf.vapi_assistant_id,

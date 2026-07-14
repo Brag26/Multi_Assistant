@@ -22,6 +22,21 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
 
+    # ── Billing ──────────────────────────────────────────────────────────
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_currency: str = "usd"
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    frontend_url: str = "http://localhost:3000"
+
+    # Make.com scenario webhook URLs — one per email type. Leave blank to skip.
+    make_welcome_email_webhook: str = ""
+    make_approval_email_webhook: str = ""
+    make_usage_warning_webhook: str = ""
+    make_invoice_email_webhook: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

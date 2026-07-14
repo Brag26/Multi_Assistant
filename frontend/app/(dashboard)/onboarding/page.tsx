@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useSessionStore } from "@/store/session";
 import { connectIntegration } from "@/lib/api";
 import { getCalendarOAuthUrl } from "@/lib/api-features";

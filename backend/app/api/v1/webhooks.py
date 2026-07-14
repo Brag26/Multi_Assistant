@@ -11,6 +11,7 @@ from app.infrastructure.repositories.calls import SqlAlchemyCallRepository
 from app.infrastructure.repositories.contacts import SqlAlchemyContactRepository
 from app.application.engine import WorkflowExecutionEngine
 from app.infrastructure.db.models import CallModel
+from app.api.v1.billing import record_usage
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 log = structlog.get_logger()
@@ -74,7 +75,10 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
                 db_call.outcome = CallOutcome.FAILED
                 
             await session.commit()
-            
+
+            if db_call.status == CallStatus.COMPLETED and db_call.duration_seconds and db_call.initiated_by_user_id:
+                await record_usage(session, t_id, db_call.initiated_by_user_id, str(db_call.id), db_call.duration_seconds)
+
             # If lead qualified, trigger lead qualified and update contact lead_status
             if db_call.outcome == CallOutcome.QUALIFIED and db_call.contact_id:
                 contact = await SqlAlchemyContactRepository(session).get(t_id, UUID(db_call.contact_id))

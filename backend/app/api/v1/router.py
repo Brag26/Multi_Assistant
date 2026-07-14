@@ -35,6 +35,7 @@ from app.api.v1.features import (
 
 from app.api.v1.outbound_webhooks import router as outbound_webhooks_router
 from app.api.v1.agent_performance import router as agent_performance_router
+from app.api.v1.billing import billing_router, public_router as billing_public_router, router as billing_webhooks_router
 
 api_router = APIRouter()
 
@@ -76,3 +77,8 @@ api_router.include_router(retry_router)
 # Outbound webhooks (Zapier/n8n style) + agent performance
 api_router.include_router(outbound_webhooks_router)
 api_router.include_router(agent_performance_router)
+
+# Billing — plans, subscriptions, Stripe + Razorpay checkout & webhooks
+api_router.include_router(billing_public_router)
+api_router.include_router(billing_router)
+api_router.include_router(billing_webhooks_router)

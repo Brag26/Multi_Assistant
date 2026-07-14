@@ -275,6 +275,7 @@ class CallModel(Base):
     campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"), index=True)
     assistant_id: Mapped[str | None] = mapped_column(String(180))
     customer_phone: Mapped[str] = mapped_column(String(40), nullable=False)
+    initiated_by_user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), index=True)
     status: Mapped[CallStatus] = mapped_column(
         Enum(CallStatus, values_callable=lambda e: [x.value for x in e], name="call_status"),
         default=CallStatus.QUEUED,

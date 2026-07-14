@@ -55,6 +55,33 @@ class AppointmentStatus(StrEnum):
     CANCELED  = "canceled"
 
 
+class BillingPlan(StrEnum):
+    STARTER    = "starter"
+    GROWTH     = "growth"
+    PRO        = "pro"
+    ENTERPRISE = "enterprise"
+
+
+class SubscriptionStatus(StrEnum):
+    TRIALING = "trialing"
+    ACTIVE   = "active"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    EXPIRED  = "expired"
+
+
+class PaymentGateway(StrEnum):
+    STRIPE   = "stripe"
+    RAZORPAY = "razorpay"
+
+
+class PaymentStatus(StrEnum):
+    PENDING  = "pending"
+    SUCCESS  = "success"
+    FAILED   = "failed"
+    REFUNDED = "refunded"
+
+
 class NotificationType(StrEnum):
     INFO    = "info"
     WARNING = "warning"

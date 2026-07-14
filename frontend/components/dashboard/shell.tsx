@@ -10,7 +10,7 @@ import {
   Plug, CalendarCheck, Bell, BarChart2, Shield, Activity,
   TrendingUp, ShieldOff, Webhook, Trophy, FileBarChart,
   Sun, Moon, Sparkles, LogOut, Settings, User, ChevronUp,
-  ShieldCheck, Zap, Mic, Target,
+  ShieldCheck, Zap, Mic, Target, CreditCard,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
@@ -25,7 +25,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/dashboard",  label: "Dashboard",     icon: LayoutDashboard },
       { href: "/analytics",  label: "Analytics",     icon: BarChart2 },
       { href: "/reports",    label: "Reports",       icon: FileBarChart },
-      { href: "/roi",        label: "ROI Dashboard", icon: Target },
     ],
   },
   {
@@ -52,16 +51,17 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Operations",
     items: [
-      { href: "/campaigns",         label: "Campaigns",        icon: Megaphone },
-      { href: "/calls",             label: "Calls",            icon: PhoneCall },
-      { href: "/agent-performance", label: "Leaderboard",      icon: Trophy },
-      { href: "/notifications",     label: "Notifications",    icon: Bell },
+      { href: "/campaigns",         label: "Campaigns",     icon: Megaphone },
+      { href: "/calls",             label: "Calls",         icon: PhoneCall },
+      { href: "/agent-performance", label: "Leaderboard",   icon: Trophy },
+      { href: "/notifications",     label: "Notifications", icon: Bell },
     ],
   },
   {
     label: "Admin",
     items: [
       { href: "/integrations", label: "Integrations", icon: Plug },
+      { href: "/billing",      label: "Billing",      icon: CreditCard },
       { href: "/audit-logs",   label: "Audit Logs",   icon: Shield },
     ],
   },
@@ -131,7 +131,7 @@ export function DashboardShell({ children }: Props) {
       <aside className="w-60 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0">
 
         {/* Logo */}
-        <div className="px-4 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
+        <div className="px-4 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div>
             <span className="font-bold text-slate-800 dark:text-slate-100 text-lg tracking-tight">VoiceOps</span>
             <span className="ml-1.5 text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded-full align-middle">AI</span>
@@ -142,10 +142,10 @@ export function DashboardShell({ children }: Props) {
           </button>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 px-2 py-3 overflow-y-auto min-h-0">
+        {/* Scrollable Nav */}
+        <nav className="flex-1 px-2 py-2 overflow-y-auto min-h-0">
           {NAV_GROUPS.map(group => (
-            <div key={group.label} className="mb-4">
+            <div key={group.label} className="mb-3">
               <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 {group.label}
               </p>
@@ -154,7 +154,7 @@ export function DashboardShell({ children }: Props) {
                   const active = pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
                     <Link key={item.href} href={item.href}
-                      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                         active
                           ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
                           : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
@@ -167,40 +167,11 @@ export function DashboardShell({ children }: Props) {
               </div>
             </div>
           ))}
-
-          {/* Role-based admin section */}
-          {(isSuperAdmin || isReseller) && (
-            <div className="mb-4">
-              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {isSuperAdmin ? "Superadmin" : "My Account"}
-              </p>
-              <Link href="/superadmin/users"
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  pathname.startsWith("/superadmin/users")
-                    ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
-                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                }`}>
-                <Users className="w-4 h-4 shrink-0 text-slate-400" />
-                {isSuperAdmin ? "Manage Users" : "My Clients"}
-              </Link>
-              {isSuperAdmin && (
-                <Link href="/superadmin/approvals"
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    pathname.startsWith("/superadmin/approvals")
-                      ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}>
-                  <ShieldCheck className="w-4 h-4 shrink-0 text-slate-400" />
-                  User Approvals
-                </Link>
-              )}
-            </div>
-          )}
         </nav>
 
         {/* Setup wizard */}
         <Link href="/onboarding"
-          className="m-2 flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950 dark:to-blue-950 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity shrink-0">
+          className="mx-2 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950 dark:to-blue-950 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity shrink-0">
           <Sparkles className="w-4 h-4" /> Setup wizard
         </Link>
 
@@ -228,6 +199,21 @@ export function DashboardShell({ children }: Props) {
                 className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <User className="w-4 h-4" /> Profile / Setup
               </Link>
+              {(isSuperAdmin || isReseller) && (
+                <>
+                  <div className="border-t border-slate-100 dark:border-slate-800" />
+                  <Link href="/superadmin/users" onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <Users className="w-4 h-4" /> {isSuperAdmin ? "Manage Users" : "My Clients"}
+                  </Link>
+                  {isSuperAdmin && (
+                    <Link href="/superadmin/approvals" onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <ShieldCheck className="w-4 h-4" /> User Approvals
+                    </Link>
+                  )}
+                </>
+              )}
               <div className="border-t border-slate-100 dark:border-slate-800" />
               <button onClick={handleSignOut}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950">
