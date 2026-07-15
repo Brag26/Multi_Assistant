@@ -58,6 +58,24 @@ async def delete_supabase_user(user_id: str) -> None:
         )
 
 
+async def reset_supabase_user_password(user_id: str, new_password: str) -> None:
+    """Directly set a new password for a user via Supabase Admin API.
+    Used by superadmin to reset a reseller's or client's password on request
+    — no email flow, the new password is handed back to superadmin to share."""
+    async with httpx.AsyncClient() as client:
+        res = await client.put(
+            f"{SUPABASE_URL}/auth/v1/admin/users/{user_id}",
+            headers={
+                "apikey": SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={"password": new_password},
+        )
+        if res.status_code not in (200, 201):
+            raise HTTPException(status_code=400, detail=res.json().get("message", "Failed to reset password"))
+
+
 @router.get("")
 async def list_users(
     user: CurrentUser,
@@ -232,6 +250,36 @@ async def update_user_role(
     )
     await db.commit()
     return {"message": "Role updated"}
+
+
+@router.post("/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: str,
+    user: CurrentUser,
+    db: AsyncSession = Depends(get_session),
+):
+    """Superadmin resets any user's password — reseller, client, or another
+    superadmin — and gets back a new temporary password to share with them.
+    Only superadmin can do this; resellers cannot reset passwords even for
+    their own clients."""
+    if user.role != Role.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Only superadmin can reset passwords")
+
+    result = await db.execute(
+        text("SELECT user_id, email FROM memberships WHERE user_id = :uid LIMIT 1"),
+        {"uid": user_id},
+    )
+    target = result.mappings().fetchone()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    import secrets
+    import string
+    alphabet = string.ascii_letters + string.digits
+    new_password = "".join(secrets.choice(alphabet) for _ in range(12))
+
+    await reset_supabase_user_password(user_id, new_password)
+    return {"ok": True, "email": target["email"], "new_password": new_password}
 
 
 @router.delete("/{user_id}")

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 type Request = {
   id: string;
@@ -72,6 +74,10 @@ export default function SuperadminApprovalsPage() {
 
   return (
     <div className="p-6">
+      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
+
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">User Approvals</h1>

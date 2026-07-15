@@ -31,8 +31,15 @@ SuperAdmin = require_role(Role.SUPER_ADMIN)
 # ── Plan config helpers (DB-backed, superadmin-editable) ────────────────────
 
 async def get_plan_configs(session: AsyncSession) -> dict[BillingPlan, dict]:
-    result = await session.execute(select(PlanConfigModel))
-    rows = {row.plan: row for row in result.scalars().all()}
+    try:
+        result = await session.execute(select(PlanConfigModel))
+        rows = {row.plan: row for row in result.scalars().all()}
+    except Exception:
+        # plan_configs migration (0005) hasn't been run against this DB yet —
+        # fall back to code defaults rather than 500ing the whole billing page.
+        await session.rollback()
+        log.warning("billing.plan_configs.missing_table")
+        rows = {}
     configs: dict[BillingPlan, dict] = {}
     for plan, defaults in PLANS.items():
         row = rows.get(plan)
@@ -49,11 +56,17 @@ async def get_plan_configs(session: AsyncSession) -> dict[BillingPlan, dict]:
 
 
 async def get_addon_configs(session: AsyncSession) -> dict[str, dict]:
-    result = await session.execute(select(AddonConfigModel))
-    return {
-        row.key: {"name": row.name, "price_inr": float(row.price_inr), "minutes": row.minutes, "description": row.description}
-        for row in result.scalars().all()
-    }
+    try:
+        result = await session.execute(select(AddonConfigModel))
+        return {
+            row.key: {"name": row.name, "price_inr": float(row.price_inr), "minutes": row.minutes, "description": row.description}
+            for row in result.scalars().all()
+        }
+    except Exception:
+        # addon_configs migration (0007) hasn't been run against this DB yet.
+        await session.rollback()
+        log.warning("billing.addon_configs.missing_table")
+        return {}
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────────
