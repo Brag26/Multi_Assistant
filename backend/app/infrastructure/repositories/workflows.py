@@ -37,6 +37,16 @@ class SqlAlchemyWorkflowRepository:
         )
         return result.scalar_one_or_none()
 
+    # ── delete (permanent) ─────────────────────────────────────────────────
+
+    async def delete_for_tenant(self, tenant_id: str, workflow_id: UUID) -> bool:
+        wf = await self.get_for_tenant(tenant_id, workflow_id)
+        if not wf:
+            return False
+        await self.session.delete(wf)
+        await self.session.commit()
+        return True
+
     # ── create ───────────────────────────────────────────────────────────────
 
     async def create(self, tenant_id: str, data: WorkflowCreate):

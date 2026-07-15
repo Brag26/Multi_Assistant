@@ -61,10 +61,20 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
             duration = payload.get("call", {}).get("duration", 0)
             transcript = payload.get("call", {}).get("transcript", "")
             summary = payload.get("call", {}).get("summary", "")
-            
+            analysis = payload.get("call", {}).get("analysis") or payload.get("analysis") or {}
+            recording_url = (
+                payload.get("call", {}).get("recordingUrl")
+                or payload.get("recordingUrl")
+                or payload.get("artifact", {}).get("recordingUrl")
+            )
+
             db_call.duration_seconds = int(duration) if duration else None
             db_call.transcript = transcript
-            db_call.summary = summary
+            db_call.summary = analysis.get("summary") or summary
+            db_call.recording_url = recording_url
+            db_call.structured_data = analysis.get("structuredData")
+            success_eval = analysis.get("successEvaluation")
+            db_call.success_evaluation = str(success_eval) if success_eval is not None else None
             db_call.ended_at = datetime.now(UTC)
             
             if ended_reason in ["normal", "customer-hung-up", "agent-hung-up"]:

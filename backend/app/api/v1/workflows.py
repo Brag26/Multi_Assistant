@@ -102,6 +102,19 @@ async def archive_workflow(
     )
 
 
+@router.delete("/{workflow_id}/permanent", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workflow_permanently(
+    tenant_id: str,
+    workflow_id: UUID,
+    user: CurrentUser,
+    service: Annotated[WorkflowService, Depends(workflow_service)],
+):
+    """Hard-delete a workflow that's no longer needed. Unlike the archive
+    endpoint above, this permanently removes the row (calls referencing it
+    keep their history via ON DELETE SET NULL)."""
+    await service.delete_workflow(user, tenant_id, workflow_id)
+
+
 # ── Activate / Deactivate ────────────────────────────────────────────────────
 
 @router.post("/{workflow_id}/activate", response_model=WorkflowRead)

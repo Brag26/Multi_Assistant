@@ -156,6 +156,8 @@ export interface CallRecord {
   duration_seconds?: number | null;
   recording_url?: string | null;
   summary?: string | null;
+  structured_data?: Record<string, unknown> | null;
+  success_evaluation?: string | null;
   started_at?: string | null;
   ended_at?: string | null;
   created_at: string;
@@ -262,6 +264,7 @@ export const createWorkflow    = (tid: string, p: Partial<Workflow>) => apiFetch
 export const updateWorkflow    = (tid: string, id: string, p: Partial<Workflow>) => apiFetch<Workflow>(`/tenants/${tid}/workflows/${id}`, { method: "PUT", body: JSON.stringify(p) });
 export const deleteWorkflow    = (tid: string, id: string) => apiFetch<void>(`/tenants/${tid}/workflows/${id}`, { method: "DELETE" });
 export const cloneWorkflow     = (tid: string, id: string) => apiFetch<Workflow>(`/tenants/${tid}/workflows/${id}/clone`, { method: "POST" });
+export const deleteWorkflowPermanently = (tid: string, id: string) => apiFetch<void>(`/tenants/${tid}/workflows/${id}/permanent`, { method: "DELETE" });
 export const activateWorkflow  = (tid: string, id: string, active: boolean) => apiFetch<Workflow>(`/tenants/${tid}/workflows/${id}/activate`, { method: "POST", body: JSON.stringify({ active }) });
 export const exportWorkflow    = (tid: string, id: string) => apiFetch<Record<string, unknown>>(`/tenants/${tid}/workflows/${id}/export`);
 export const importWorkflow    = (tid: string, p: Record<string, unknown>) => apiFetch<Workflow>(`/tenants/${tid}/workflows/import`, { method: "POST", body: JSON.stringify(p) });

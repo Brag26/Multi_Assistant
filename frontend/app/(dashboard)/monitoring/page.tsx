@@ -137,6 +137,33 @@ export default function CallMonitoringPage() {
                       <audio controls src={selectedCall.recording_url} className="w-full h-8" />
                     </div>
                   )}
+                  {selectedCall.success_evaluation && (
+                    <div className="mt-3">
+                      <p className="text-xs font-medium text-slate-400 mb-1">Success Evaluation</p>
+                      <span className={`inline-block text-xs px-2.5 py-1 rounded-full font-medium ${
+                        /^(true|pass|good|qualified)/i.test(selectedCall.success_evaluation)
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}>
+                        {selectedCall.success_evaluation}
+                      </span>
+                    </div>
+                  )}
+                  {selectedCall.structured_data && Object.keys(selectedCall.structured_data).length > 0 && (
+                    <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs font-medium text-slate-400 mb-2">Structured Data</p>
+                      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        {Object.entries(selectedCall.structured_data).map(([key, value]) => (
+                          <div key={key}>
+                            <dt className="text-slate-400 text-xs capitalize">{key.replace(/_/g, " ")}</dt>
+                            <dd className="font-medium mt-0.5 break-words">
+                              {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PhoneCall, Play, Pause, Copy, Settings, Clock, Zap } from "lucide-react";
-import { listWorkflows, activateWorkflow, cloneWorkflow, type Workflow } from "@/lib/api";
+import { PhoneCall, Play, Pause, Copy, Settings, Clock, Zap, Trash2 } from "lucide-react";
+import { listWorkflows, activateWorkflow, cloneWorkflow, deleteWorkflowPermanently, type Workflow } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -40,6 +40,11 @@ export function WorkflowList({ tenantId, onOpen }: Props) {
 
   const cloneMut = useMutation({
     mutationFn: (id: string) => cloneWorkflow(tenantId, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workflows", tenantId] }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteWorkflowPermanently(tenantId, id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workflows", tenantId] }),
   });
 
@@ -110,6 +115,15 @@ export function WorkflowList({ tenantId, onOpen }: Props) {
                 title="Clone"
                 onClick={() => cloneMut.mutate(wf.id)}>
                 <Copy className="w-3.5 h-3.5 text-slate-500" />
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2"
+                title="Delete permanently"
+                onClick={() => {
+                  if (window.confirm(`Delete "${wf.name}" permanently? This can't be undone.`)) {
+                    deleteMut.mutate(wf.id);
+                  }
+                }}>
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
               </Button>
             </div>
           </CardContent>

@@ -41,6 +41,14 @@ class WorkflowService:
             raise HTTPException(status_code=403, detail="Cannot create workflows")
         return await self.workflows.create(tenant_id, data)
 
+    async def delete_workflow(self, user: Principal, tenant_id: str, workflow_id: UUID):
+        require_tenant_access(user, tenant_id)
+        if user.role not in _WRITE_ROLES:
+            raise HTTPException(status_code=403, detail="Cannot delete workflows")
+        deleted = await self.workflows.delete_for_tenant(tenant_id, workflow_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+
     async def update_workflow(self, user: Principal, tenant_id: str,
                               workflow_id: UUID, data: dict):
         require_tenant_access(user, tenant_id)

@@ -341,6 +341,8 @@ class CallRead(BaseModel):
     transcript_url: str | None
     recording_url: str | None
     summary: str | None
+    structured_data: dict | None
+    success_evaluation: str | None
     metadata: dict = Field(default_factory=dict, validation_alias="metadata_")
     created_at: datetime
 
@@ -386,6 +388,7 @@ class LeadActivityRead(BaseModel):
 
 class IntegrationConnect(BaseModel):
     name: str | None = None
+    owner_user_id: str | None = None
     api_key: str | None = None
     account_sid: str | None = None
     auth_token: str | None = None
@@ -399,6 +402,7 @@ class IntegrationRead(BaseModel):
     tenant_id: UUID
     provider: IntegrationProvider
     name: str
+    owner_user_id: str | None = None
     config: dict
     connected_at: datetime | None
     disconnected_at: datetime | None

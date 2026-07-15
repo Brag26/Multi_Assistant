@@ -169,11 +169,13 @@ export function DashboardShell({ children }: Props) {
           ))}
         </nav>
 
-        {/* Setup wizard */}
-        <Link href="/onboarding"
-          className="mx-2 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950 dark:to-blue-950 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity shrink-0">
-          <Sparkles className="w-4 h-4" /> Setup wizard
-        </Link>
+        {/* Setup wizard — superadmin only; clients/resellers use whatever setup is assigned to them */}
+        {userRole === "super_admin" && (
+          <Link href="/onboarding"
+            className="mx-2 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950 dark:to-blue-950 text-indigo-700 dark:text-indigo-300 hover:opacity-80 transition-opacity shrink-0">
+            <Sparkles className="w-4 h-4" /> Setup wizard
+          </Link>
+        )}
 
         {/* User menu */}
         <div className="relative border-t border-slate-100 dark:border-slate-800 shrink-0" ref={menuRef}>

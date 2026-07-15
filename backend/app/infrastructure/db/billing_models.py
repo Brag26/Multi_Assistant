@@ -48,9 +48,9 @@ class PaymentModel(Base):
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
     subscription_id: Mapped[str | None] = mapped_column(ForeignKey("subscriptions.id", ondelete="SET NULL"), index=True)
-    gateway: Mapped[PaymentGateway] = mapped_column(
+    gateway: Mapped[PaymentGateway | None] = mapped_column(
         Enum(PaymentGateway, values_callable=lambda e: [x.value for x in e], name="payment_gateway"),
-        nullable=False,
+        nullable=True,
     )
     gateway_payment_id: Mapped[str | None] = mapped_column(String(160), index=True)
     gateway_order_id: Mapped[str | None] = mapped_column(String(160), index=True)
@@ -63,6 +63,8 @@ class PaymentModel(Base):
     plan: Mapped[BillingPlan | None] = mapped_column(
         Enum(BillingPlan, values_callable=lambda e: [x.value for x in e], name="billing_plan"),
     )
+    addon_key: Mapped[str | None] = mapped_column(String(60))
+    addon_key: Mapped[str | None] = mapped_column(String(60))
     receipt_url: Mapped[str | None] = mapped_column(String(500))
     raw_payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -77,3 +79,32 @@ class UsageLogModel(Base):
     call_id: Mapped[str | None] = mapped_column(ForeignKey("voice_calls.id", ondelete="SET NULL"), index=True)
     minutes: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlanConfigModel(Base):
+    """Superadmin-editable plan pricing/limits. Seeded from core/plans.py
+    defaults in migration 0005; the code defaults remain as a fallback if a
+    row is ever missing."""
+    __tablename__ = "plan_configs"
+    plan: Mapped[BillingPlan] = mapped_column(
+        Enum(BillingPlan, values_callable=lambda e: [x.value for x in e], name="billing_plan"),
+        primary_key=True,
+    )
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    price_inr: Mapped[float | None] = mapped_column(Numeric(10, 2))
+    minutes_limit: Mapped[int | None] = mapped_column(Integer)
+    description: Mapped[str] = mapped_column(String(500), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AddonConfigModel(Base):
+    """One-time top-up packs (e.g. +100 minutes for ₹5000), editable by
+    superadmin. `key` is a stable slug so new add-on types can be added later
+    without a schema change."""
+    __tablename__ = "addon_configs"
+    key: Mapped[str] = mapped_column(String(60), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    price_inr: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[str] = mapped_column(String(300), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

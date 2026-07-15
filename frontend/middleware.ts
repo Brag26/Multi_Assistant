@@ -12,6 +12,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/_next") ||
     pathname.startsWith("/pending") ||
     pathname.startsWith("/demo") ||
+    pathname.startsWith("/pricing") ||
     pathname.startsWith("/rejected") ||
     pathname.startsWith("/reset-password")
   ) {
@@ -47,7 +48,7 @@ export async function middleware(request: NextRequest) {
     const token = (await supabase.auth.getSession()).data.session?.access_token;
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) }
     );
 
     if (res.ok) {

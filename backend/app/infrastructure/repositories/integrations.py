@@ -22,6 +22,7 @@ class SqlAlchemyIntegrationRepository:
             tenant_id=tenant_id,
             provider=provider,
             name=data.name or provider.value.title(),
+            owner_user_id=data.owner_user_id,
             config={**data.config, "webhook_url": str(data.webhook_url) if data.webhook_url else None},
             secret_ref=f"{tenant_id}/{provider.value}",
             connected_at=datetime.now(UTC),
