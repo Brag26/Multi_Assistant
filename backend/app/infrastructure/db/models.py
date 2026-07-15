@@ -146,6 +146,21 @@ class IntegrationAssetModel(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "provider", "external_id", name="uq_integration_assets_external"),)
 
 
+class AssistantAssignmentModel(Base):
+    """Who can use which Vapi assistant. Superadmin assigns to resellers;
+    resellers can only re-assign assistants that were already assigned to
+    them, and only to their own clients."""
+    __tablename__ = "assistant_assignments"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    assistant_external_id: Mapped[str] = mapped_column(String(180), nullable=False)
+    assistant_label: Mapped[str] = mapped_column(String(180), nullable=False)
+    assigned_to_user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    assigned_by_user_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (UniqueConstraint("assistant_external_id", "assigned_to_user_id", name="uq_assistant_assignment"),)
+
+
 class WebhookLogModel(Base):
     __tablename__ = "webhook_logs"
     id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
