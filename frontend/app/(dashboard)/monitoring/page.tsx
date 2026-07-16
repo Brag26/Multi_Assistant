@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
-import { listCalls, listCallEvents, type CallRecord, type CallMonitoringEvent } from "@/lib/api";
+import { listCalls, listCallEvents, apiFetch, type CallRecord, type CallMonitoringEvent } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { LiveTranscriptPanel } from "@/components/dashboard/LiveTranscriptPanel";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -22,6 +22,9 @@ export default function CallMonitoringPage() {
   const tenantId = useSessionStore(s => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  const [recordingError, setRecordingError] = useState(false);
 
   const { data: calls = [], isLoading } = useQuery<CallRecord[]>({
     queryKey: ["calls", tenantId, statusFilter],
@@ -38,6 +41,17 @@ export default function CallMonitoringPage() {
   });
 
   const selectedCall = calls.find(c => c.id === selectedCallId);
+
+  useEffect(() => {
+    setRecordingUrl(null);
+    setRecordingError(false);
+    if (!selectedCall?.recording_url || !tenantId) return;
+    setRecordingLoading(true);
+    apiFetch<{ recording_url: string }>(`/tenants/${tenantId}/calls/${selectedCall.id}/recording-url`)
+      .then((res) => setRecordingUrl(res.recording_url))
+      .catch(() => setRecordingError(true))
+      .finally(() => setRecordingLoading(false));
+  }, [selectedCall?.id, tenantId]);
   const isCallActive = selectedCall?.status === "in_progress";
 
   return (
@@ -134,7 +148,13 @@ export default function CallMonitoringPage() {
                       <p className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1">
                         <Mic className="w-3 h-3" /> Recording
                       </p>
-                      <audio controls src={selectedCall.recording_url} className="w-full h-8" />
+                      {recordingLoading ? (
+                        <p className="text-xs text-slate-400">Loading recording…</p>
+                      ) : recordingError ? (
+                        <p className="text-xs text-amber-600">Couldn't load recording — it may have expired or Vapi's storage settings changed.</p>
+                      ) : recordingUrl ? (
+                        <audio controls src={recordingUrl} className="w-full h-8" />
+                      ) : null}
                     </div>
                   )}
                   {selectedCall.success_evaluation && (
