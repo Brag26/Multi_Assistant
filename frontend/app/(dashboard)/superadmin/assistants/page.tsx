@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mic, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Mic, UserPlus, X, RefreshCw } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 import { adminListAccounts, type AdminAccount } from "@/lib/api-billing";
+import { refreshVapiAssistants } from "@/lib/api";
 
 interface AssistantHolder {
   assignment_id: string;
@@ -31,6 +32,17 @@ export default function SuperadminAssistantsPage() {
   const [assigning, setAssigning] = useState<Assistant | null>(null);
   const [pickedUser, setPickedUser] = useState("");
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      await refreshVapiAssistants(tenantId);
+      await refresh();
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function getToken() {
     const supabase = createSupabaseBrowserClient();
@@ -108,13 +120,19 @@ export default function SuperadminAssistantsPage() {
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <Mic className="w-5 h-5 text-indigo-600" /> Manage Assistants
-        </h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          Assign Vapi assistants to resellers or clients. Resellers can only re-assign what you've given them.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Mic className="w-5 h-5 text-indigo-600" /> Manage Assistants
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Assign Vapi assistants to resellers or clients. Resellers can only re-assign what you've given them.
+          </p>
+        </div>
+        <button onClick={handleSync} disabled={syncing}
+          className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 shrink-0">
+          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Syncing…" : "Sync from Vapi"}
+        </button>
       </div>
 
       {loading ? (
@@ -125,7 +143,7 @@ export default function SuperadminAssistantsPage() {
         </div>
       ) : assistants.length === 0 ? (
         <p className="text-sm text-slate-400">
-          No assistants synced yet — connect Vapi and refresh assistants from the Setup Wizard first.
+          No assistants synced yet — click "Sync from Vapi" above to pull them in.
         </p>
       ) : (
         <div className="space-y-3">

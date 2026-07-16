@@ -323,6 +323,7 @@ export const campaignAction  = (tid: string, cid: string, action: "pause" | "res
 // ─── Integrations ─────────────────────────────────────────────────────────────
 
 export const listIntegrations    = (tid: string) => apiFetch<Integration[]>(`/tenants/${tid}/integrations`);
+export const refreshVapiAssistants = (tid: string) => apiFetch<any[]>(`/tenants/${tid}/integrations/vapi/refresh-assistants`, { method: "POST" });
 export const connectIntegration  = (tid: string, provider: string, p: Record<string, unknown>) => apiFetch<Integration>(`/tenants/${tid}/integrations/${provider}/connect`, { method: "POST", body: JSON.stringify(p) });
 export const disconnectIntegration = (tid: string, provider: string) => apiFetch<Integration | null>(`/tenants/${tid}/integrations/${provider}/disconnect`, { method: "POST" });
 export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make") => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets`);
