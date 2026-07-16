@@ -143,6 +143,15 @@ class IntegrationService:
         self._can_manage(user, tenant_id)
         return await self.integrations.disconnect(tenant_id, provider)
 
+    async def delete_profile(self, user: Principal, tenant_id: str, name: str, owner_user_id: str | None):
+        require_tenant_access(user, tenant_id)
+        if user.role != Role.SUPER_ADMIN:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only superadmin can delete a setup profile")
+        deleted = await self.integrations.delete_profile(tenant_id, name, owner_user_id)
+        if deleted == 0:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setup profile not found")
+        return {"ok": True, "deleted_connections": deleted}
+
     async def refresh_vapi_assistants(self, user: Principal, tenant_id: str):
         self._can_manage(user, tenant_id)
         assistants = await VapiClient().fetch_assistants()

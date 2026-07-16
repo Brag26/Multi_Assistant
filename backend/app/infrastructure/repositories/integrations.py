@@ -18,12 +18,41 @@ class SqlAlchemyIntegrationRepository:
         return result.scalars().all()
 
     async def connect(self, tenant_id: str, provider: IntegrationProvider, data: IntegrationConnect):
+        merged_config = {
+            **data.config,
+            **({"api_key": data.api_key} if data.api_key else {}),
+            **({"account_sid": data.account_sid} if data.account_sid else {}),
+            **({"auth_token": data.auth_token} if data.auth_token else {}),
+            "webhook_url": str(data.webhook_url) if data.webhook_url else None,
+        }
+        profile_name = data.name or provider.value.title()
+
+        # Upsert: if this exact profile (same name + owner) already has an
+        # active connection for this provider, update it in place instead of
+        # creating a duplicate row — this is what makes a saved setup editable.
+        existing_result = await self.session.execute(
+            select(IntegrationModel).where(
+                IntegrationModel.tenant_id == tenant_id,
+                IntegrationModel.provider == provider,
+                IntegrationModel.name == profile_name,
+                IntegrationModel.owner_user_id == data.owner_user_id,
+                IntegrationModel.disconnected_at.is_(None),
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+        if existing:
+            existing.config = merged_config
+            existing.connected_at = datetime.now(UTC)
+            await self.session.commit()
+            await self.session.refresh(existing)
+            return existing
+
         integration = IntegrationModel(
             tenant_id=tenant_id,
             provider=provider,
-            name=data.name or provider.value.title(),
+            name=profile_name,
             owner_user_id=data.owner_user_id,
-            config={**data.config, "webhook_url": str(data.webhook_url) if data.webhook_url else None},
+            config=merged_config,
             secret_ref=f"{tenant_id}/{provider.value}",
             connected_at=datetime.now(UTC),
             disconnected_at=None,
@@ -32,6 +61,22 @@ class SqlAlchemyIntegrationRepository:
         await self.session.commit()
         await self.session.refresh(integration)
         return integration
+
+    async def delete_profile(self, tenant_id: str, name: str, owner_user_id: str | None):
+        """Hard-delete every provider connection saved under one profile name
+        (e.g. deleting "Setup 2" removes its Vapi row, Twilio row, etc. together)."""
+        result = await self.session.execute(
+            select(IntegrationModel).where(
+                IntegrationModel.tenant_id == tenant_id,
+                IntegrationModel.name == name,
+                IntegrationModel.owner_user_id == owner_user_id,
+            )
+        )
+        rows = result.scalars().all()
+        for row in rows:
+            await self.session.delete(row)
+        await self.session.commit()
+        return len(rows)
 
     async def disconnect(self, tenant_id: str, provider: IntegrationProvider):
         result = await self.session.execute(select(IntegrationModel).where(IntegrationModel.tenant_id == tenant_id, IntegrationModel.provider == provider, IntegrationModel.disconnected_at.is_(None)).order_by(IntegrationModel.created_at.desc()))

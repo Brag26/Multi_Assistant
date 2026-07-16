@@ -132,6 +132,7 @@ export interface Integration {
   id: string;
   provider: "vapi" | "twilio" | "make";
   name: string;
+  owner_user_id?: string | null;
   connected_at?: string | null;
   disconnected_at?: string | null;
 }

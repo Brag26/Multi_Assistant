@@ -87,6 +87,8 @@ export default function OnboardingPage() {
   const router = useRouter();
   const tenantId = useSessionStore(s => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
   const [connected, setConnected] = useState<ConnectedMap>({});
+  const [rawIntegrations, setRawIntegrations] = useState<{ id: string; provider: string; name: string; owner_user_id: string | null; connected_at: string | null }[]>([]);
+  const [deletingProfile, setDeletingProfile] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>("vapi");
   const [saving, setSaving] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, FieldValues>>({});
@@ -123,7 +125,7 @@ export default function OnboardingPage() {
   }, [role]);
 
 // Load saved integrations on mount
-useEffect(() => {
+function loadIntegrations() {
   if (!tenantId) return;
   import("@/lib/api").then(({ listIntegrations }) => {
     listIntegrations(tenantId)
@@ -133,11 +135,56 @@ useEffect(() => {
           map[i.provider] = true;
         });
         setConnected(map);
+        setRawIntegrations(integrations as any);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   });
-}, [tenantId]);
+}
+useEffect(() => { loadIntegrations(); }, [tenantId]);
+
+// Group raw integration rows into named setup profiles for the Saved Setups panel
+const profiles = (() => {
+  const groups: Record<string, { name: string; owner_user_id: string | null; providers: string[]; connected_at: string | null }> = {};
+  for (const row of rawIntegrations) {
+    const key = `${row.name}::${row.owner_user_id ?? ""}`;
+    if (!groups[key]) groups[key] = { name: row.name, owner_user_id: row.owner_user_id, providers: [], connected_at: row.connected_at };
+    groups[key].providers.push(row.provider);
+  }
+  return Object.values(groups);
+})();
+
+function ownerLabel(ownerUserId: string | null): string {
+  if (!ownerUserId) return "Shared / platform-wide";
+  const acct = accounts.find((a) => a.user_id === ownerUserId);
+  if (!acct) return "Assigned";
+  return (acct.role === "tenant_admin" ? "Reseller: " : "Client: ") + (acct.display_name || acct.email);
+}
+
+function editProfile(p: { name: string; owner_user_id: string | null }) {
+  setProfileName(p.name);
+  setOwnerUserId(p.owner_user_id ?? "");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function deleteProfile(p: { name: string; owner_user_id: string | null }) {
+  const key = `${p.name}::${p.owner_user_id ?? ""}`;
+  setDeletingProfile(key);
+  try {
+    const { createSupabaseBrowserClient } = await import("@/lib/supabase");
+    const supabase = createSupabaseBrowserClient();
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    const qs = p.owner_user_id ? `?owner_user_id=${encodeURIComponent(p.owner_user_id)}` : "";
+    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tenants/${tenantId}/integrations/profiles/${encodeURIComponent(p.name)}${qs}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    loadIntegrations();
+  } finally {
+    setDeletingProfile(null);
+  }
+}
   
   function getFields(providerId: string): FieldValues { return fieldValues[providerId] ?? {}; }
   function setField(providerId: string, key: string, value: string) {
@@ -166,6 +213,7 @@ useEffect(() => {
         await connectIntegration(tenantId, provider.id, payload);
       }
       setConnected(prev => ({ ...prev, [provider.id]: true }));
+      loadIntegrations();
       setExpanded(null);
     } catch (e: unknown) {
       setErrors(prev => ({ ...prev, [provider.id]: e instanceof Error ? e.message : "Connection failed" }));
@@ -238,6 +286,47 @@ useEffect(() => {
             <p className="mt-1 text-[11px] text-slate-400">Leave unassigned for a shared, platform-wide setup.</p>
           </div>
         </div>
+
+        {profiles.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Saved Setups ({profiles.length})</h2>
+              <button onClick={() => { setProfileName(""); setOwnerUserId(""); }}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                + New Setup
+              </button>
+            </div>
+            <div className="space-y-2">
+              {profiles.map((p) => {
+                const key = `${p.name}::${p.owner_user_id ?? ""}`;
+                const isCurrent = profileName === p.name && ownerUserId === (p.owner_user_id ?? "");
+                return (
+                  <div key={key}
+                    className={`flex items-center justify-between p-3 rounded-lg border bg-white ${isCurrent ? "border-indigo-400 ring-1 ring-indigo-200" : "border-slate-200"}`}>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{p.name}</p>
+                      <p className="text-xs text-slate-400">{ownerLabel(p.owner_user_id)} · {p.providers.join(", ")}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => editProfile(p)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100">
+                        Edit
+                      </button>
+                      <button onClick={() => { if (window.confirm(`Delete "${p.name}"? This removes all its connections (${p.providers.join(", ")}).`)) deleteProfile(p); }}
+                        disabled={deletingProfile === key}
+                        className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50">
+                        {deletingProfile === key ? "Deleting…" : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">
+              To create a new setup, clear the Profile Name above and enter a new one — Setup 1, Setup 2, Setup 3, however many you need.
+            </p>
+          </div>
+        )}
 
         <div className="flex gap-2 mb-6 flex-wrap">
           {categories.map(([catId, cat]) => {

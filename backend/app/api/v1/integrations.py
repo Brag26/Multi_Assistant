@@ -21,6 +21,12 @@ async def connect_provider(tenant_id: str, provider: IntegrationProvider, payloa
 async def disconnect_provider(tenant_id: str, provider: IntegrationProvider, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)]):
     return await service.disconnect(user, tenant_id, provider)
 
+@router.delete("/profiles/{name}")
+async def delete_profile(tenant_id: str, name: str, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)], owner_user_id: str | None = None):
+    """Delete a whole named setup (e.g. "Setup 2") — removes every provider
+    connection saved under that name. Superadmin only."""
+    return await service.delete_profile(user, tenant_id, name, owner_user_id)
+
 @router.post("/vapi/refresh-assistants", response_model=list[IntegrationAssetRead])
 async def refresh_vapi_assistants(tenant_id: str, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)]):
     return await service.refresh_vapi_assistants(user, tenant_id)
