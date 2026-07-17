@@ -170,3 +170,20 @@ class CallService:
                 {"call_id": str(call.id), "provider_call_id": provider_call_id},
             )
         return await self.calls.get(call.id)
+
+    async def launch_test_call(self, user: Principal, tenant_id: str, assistant_id: str, customer_phone: str):
+        """Dial one number right now using an assistant directly — no workflow
+        required. Used by the 'Test Call' button for quick manual testing."""
+        require_tenant_access(user, tenant_id)
+        if user.role not in {Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.MANAGER, Role.AGENT}:
+            raise HTTPException(status_code=403, detail="Cannot launch calls")
+        from app.application.schemas import LaunchCallRequest
+        request = LaunchCallRequest(customer_phone=customer_phone)
+        call = await self.calls.create_queued(
+            tenant_id, None, request, assistant_id=assistant_id, initiated_by_user_id=user.user_id
+        )
+        provider_call_id = await self.vapi.start_call(
+            customer_phone, assistant_id, {"call_id": str(call.id)},
+        )
+        await self.calls.mark_started(call.id, provider_call_id)
+        return await self.calls.get(call.id)

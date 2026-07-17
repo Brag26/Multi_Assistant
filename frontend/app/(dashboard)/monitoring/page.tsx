@@ -6,6 +6,7 @@ import { useSessionStore } from "@/store/session";
 import { listCalls, listCallEvents, apiFetch, type CallRecord, type CallMonitoringEvent } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { LiveTranscriptPanel } from "@/components/dashboard/LiveTranscriptPanel";
+import { TestCallModal } from "@/components/dashboard/TestCallModal";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PhoneCall, Activity, Clock, Mic } from "lucide-react";
@@ -25,6 +26,7 @@ export default function CallMonitoringPage() {
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [recordingLoading, setRecordingLoading] = useState(false);
   const [recordingError, setRecordingError] = useState(false);
+  const [testCallOpen, setTestCallOpen] = useState(false);
 
   const { data: calls = [], isLoading } = useQuery<CallRecord[]>({
     queryKey: ["calls", tenantId, statusFilter],
@@ -56,10 +58,16 @@ export default function CallMonitoringPage() {
 
   return (
     <DashboardShell>
-      <div className="mb-6">
-        <p className="text-sm font-medium text-blue-700">Operations</p>
-        <h2 className="text-2xl font-semibold tracking-tight">Call Monitoring</h2>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-blue-700">Operations</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Call Monitoring</h2>
+        </div>
+        <Button size="sm" className="gap-1.5 shrink-0" onClick={() => setTestCallOpen(true)}>
+          <PhoneCall className="w-3.5 h-3.5" /> Test Call
+        </Button>
       </div>
+      <TestCallModal tenantId={tenantId} open={testCallOpen} onClose={() => setTestCallOpen(false)} />
 
       {/* Filter tabs */}
       <div className="flex gap-1.5 mb-4">

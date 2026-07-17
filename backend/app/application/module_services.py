@@ -122,6 +122,15 @@ class CampaignService:
         self._can_manage(user, tenant_id)
         return await self.campaigns.clone(tenant_id, campaign_id)
 
+    async def launch_now(self, user: Principal, tenant_id: str, campaign_id: UUID):
+        """Start dialing immediately instead of waiting for the campaign's
+        scheduled_at (or for one to be set at all)."""
+        self._can_manage(user, tenant_id)
+        campaign = await self.campaigns.set_status(tenant_id, campaign_id, CampaignStatus.RUNNING)
+        from app.workers.scheduler import launch_campaign_calls
+        launch_campaign_calls.delay(str(campaign_id), tenant_id)
+        return campaign
+
     def _can_manage(self, user: Principal, tenant_id: str) -> None:
         require_tenant_access(user, tenant_id)
         if user.role not in WRITE_ROLES:

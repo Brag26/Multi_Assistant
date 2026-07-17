@@ -42,14 +42,14 @@ class SqlAlchemyCallRepository:
     async def create_queued(
         self,
         tenant_id: str,
-        workflow_id: UUID,
+        workflow_id: UUID | None,
         request: LaunchCallRequest,
         assistant_id: str | None = None,
         initiated_by_user_id: str | None = None,
     ):
         call = CallModel(
             tenant_id=tenant_id,
-            workflow_id=str(workflow_id),
+            workflow_id=str(workflow_id) if workflow_id else None,
             contact_id=str(request.contact_id) if request.contact_id else None,
             campaign_id=str(request.campaign_id) if request.campaign_id else None,
             assistant_id=assistant_id,

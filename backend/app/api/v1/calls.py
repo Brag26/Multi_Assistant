@@ -1,10 +1,14 @@
 ﻿from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 
-from app.api.deps import SessionDep
+from app.api.deps import SessionDep, call_service
+from app.application.module_services import CallService
 from app.application.schemas import CallRead
 from app.core.security import CurrentUser, require_tenant_access
 from app.infrastructure.integrations.vapi import VapiClient
 from app.infrastructure.repositories.calls import SqlAlchemyCallRepository
+from typing import Annotated
+from fastapi import Depends
 
 router = APIRouter(prefix="/tenants/{tenant_id}/calls", tags=["calls"])
 
@@ -12,6 +16,23 @@ router = APIRouter(prefix="/tenants/{tenant_id}/calls", tags=["calls"])
 async def list_calls(tenant_id: str, user: CurrentUser, session: SessionDep, campaign_id: str | None = None, contact_id: str | None = None):
     require_tenant_access(user, tenant_id)
     return await SqlAlchemyCallRepository(session).list_for_tenant(tenant_id, campaign_id=campaign_id, contact_id=contact_id)
+
+
+class TestCallRequest(BaseModel):
+    assistant_id: str
+    customer_phone: str
+
+
+@router.post("/test", response_model=CallRead, status_code=202)
+async def launch_test_call(
+    tenant_id: str,
+    payload: TestCallRequest,
+    user: CurrentUser,
+    service: Annotated[CallService, Depends(call_service)],
+):
+    """Dial one number right now with a chosen assistant — no workflow or
+    campaign needed. For quick manual testing."""
+    return await service.launch_test_call(user, tenant_id, payload.assistant_id, payload.customer_phone)
 
 
 @router.get("/{call_id}/recording-url")

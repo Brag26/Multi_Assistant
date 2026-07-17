@@ -283,6 +283,7 @@ export const listRunSteps  = (tid: string, id: string, rid: string) => apiFetch<
 // ─── Calls ────────────────────────────────────────────────────────────────────
 
 export const listCalls      = (tid: string, status?: string) => apiFetch<CallRecord[]>(`/tenants/${tid}/calls${status ? `?status=${status}` : ""}`);
+export const testCall       = (tid: string, assistant_id: string, customer_phone: string) => apiFetch<CallRecord>(`/tenants/${tid}/calls/test`, { method: "POST", body: JSON.stringify({ assistant_id, customer_phone }) });
 export const listActiveCalls= (tid: string) => apiFetch<CallRecord[]>(`/tenants/${tid}/calls/active`);
 export const addCallEvent   = (tid: string, callId: string, p: Partial<CallMonitoringEvent>) => apiFetch<CallMonitoringEvent>(`/tenants/${tid}/calls/${callId}/events`, { method: "POST", body: JSON.stringify(p) });
 export const listCallEvents = (tid: string, callId: string) => apiFetch<CallMonitoringEvent[]>(`/tenants/${tid}/calls/${callId}/events`);
@@ -318,12 +319,15 @@ export const listAuditLogs = (tid: string, resourceType?: string) => apiFetch<Au
 // ─── Campaigns ────────────────────────────────────────────────────────────────
 
 export const listCampaigns   = (tid: string) => apiFetch<Campaign[]>(`/tenants/${tid}/campaigns`);
-export const campaignAction  = (tid: string, cid: string, action: "pause" | "resume" | "cancel" | "clone") => apiFetch<Campaign>(`/tenants/${tid}/campaigns/${cid}/${action}`, { method: "POST" });
+export const createCampaign  = (tid: string, data: { name: string; vapi_assistant_id: string; contact_ids: string[]; scheduled_at?: string | null }) =>
+  apiFetch<Campaign>(`/tenants/${tid}/campaigns`, { method: "POST", body: JSON.stringify(data) });
+export const campaignAction  = (tid: string, cid: string, action: "pause" | "resume" | "cancel" | "clone" | "launch") => apiFetch<Campaign>(`/tenants/${tid}/campaigns/${cid}/${action}`, { method: "POST" });
 
 // ─── Integrations ─────────────────────────────────────────────────────────────
 
 export const listIntegrations    = (tid: string) => apiFetch<Integration[]>(`/tenants/${tid}/integrations`);
 export const refreshVapiAssistants = (tid: string) => apiFetch<any[]>(`/tenants/${tid}/integrations/vapi/refresh-assistants`, { method: "POST" });
+export const listMyAssistants = (tid: string) => apiFetch<{ external_id: string; label: string }[]>(`/tenants/${tid}/assistants`);
 export const connectIntegration  = (tid: string, provider: string, p: Record<string, unknown>) => apiFetch<Integration>(`/tenants/${tid}/integrations/${provider}/connect`, { method: "POST", body: JSON.stringify(p) });
 export const disconnectIntegration = (tid: string, provider: string) => apiFetch<Integration | null>(`/tenants/${tid}/integrations/${provider}/disconnect`, { method: "POST" });
 export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make") => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets`);

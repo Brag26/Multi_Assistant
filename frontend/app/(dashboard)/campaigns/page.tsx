@@ -7,8 +7,9 @@ import { listCampaigns, campaignAction, type Campaign } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Megaphone, Pause, Play, Copy, X, Clock, BarChart2 } from "lucide-react";
+import { Megaphone, Pause, Play, Copy, X, Clock, BarChart2, Plus, Rocket } from "lucide-react";
 import Link from "next/link";
+import { NewCampaignModal } from "@/components/dashboard/NewCampaignModal";
 
 const STATUS_STYLE: Record<string, string> = {
   draft:     "bg-slate-100 text-slate-600",
@@ -23,6 +24,7 @@ export default function CampaignsPage() {
   const tenantId = useSessionStore(s => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [newCampaignOpen, setNewCampaignOpen] = useState(false);
 
   const { data: campaigns = [], isLoading } = useQuery<Campaign[]>({
     queryKey: ["campaigns", tenantId],
@@ -32,7 +34,7 @@ export default function CampaignsPage() {
   });
 
   const actionMut = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: "pause" | "resume" | "cancel" | "clone" }) =>
+    mutationFn: ({ id, action }: { id: string; action: "pause" | "resume" | "cancel" | "clone" | "launch" }) =>
       campaignAction(tenantId, id, action),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["campaigns", tenantId] }),
   });
@@ -41,12 +43,19 @@ export default function CampaignsPage() {
 
   return (
     <DashboardShell>
-      <div className="mb-6">
-        <p className="text-sm font-medium text-blue-700">Outreach</p>
-        <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-          <Megaphone className="w-6 h-6" /> Campaigns
-        </h2>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-blue-700">Outreach</p>
+          <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Megaphone className="w-6 h-6" /> Campaigns
+          </h2>
+        </div>
+        <Button size="sm" className="gap-1.5 shrink-0" onClick={() => setNewCampaignOpen(true)}>
+          <Plus className="w-3.5 h-3.5" /> New Campaign
+        </Button>
       </div>
+      <NewCampaignModal tenantId={tenantId} open={newCampaignOpen} onClose={() => setNewCampaignOpen(false)}
+        onCreated={() => queryClient.invalidateQueries({ queryKey: ["campaigns", tenantId] })} />
 
       <div className="flex gap-1.5 mb-4 flex-wrap">
         {[undefined, "draft", "scheduled", "running", "paused", "completed"].map(s => (
@@ -97,6 +106,13 @@ export default function CampaignsPage() {
                       className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md text-slate-500 hover:bg-slate-100 transition-colors">
                       <BarChart2 className="w-3.5 h-3.5" /> Report
                     </Link>
+                    {(c.status === "draft" || c.status === "scheduled") && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-indigo-600"
+                        title="Launch now"
+                        onClick={() => actionMut.mutate({ id: c.id, action: "launch" })}>
+                        <Rocket className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
                     {c.status === "running" && (
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-amber-600"
                         onClick={() => actionMut.mutate({ id: c.id, action: "pause" })}>

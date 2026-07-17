@@ -36,3 +36,8 @@ async def cancel_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, 
 @router.post("/{campaign_id}/clone", response_model=CampaignRead, status_code=201)
 async def clone_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
     return await service.clone(user, tenant_id, campaign_id)
+
+@router.post("/{campaign_id}/launch", response_model=CampaignRead)
+async def launch_campaign_now(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
+    """Start dialing every attached contact right now, instead of waiting on scheduled_at."""
+    return await service.launch_now(user, tenant_id, campaign_id)
