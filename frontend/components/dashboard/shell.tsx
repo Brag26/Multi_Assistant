@@ -197,6 +197,10 @@ export function DashboardShell({ children }: Props) {
                 className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <Settings className="w-4 h-4" /> Settings
               </Link>
+              <Link href="/settings" onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                <Sparkles className="w-4 h-4" /> Preferences (Timezone)
+              </Link>
               <Link href="/onboarding" onClick={() => setMenuOpen(false)}
                 className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                 <User className="w-4 h-4" /> Profile / Setup

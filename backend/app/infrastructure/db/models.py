@@ -51,6 +51,7 @@ class MembershipModel(Base):
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    timezone: Mapped[str | None] = mapped_column(String(60))
     tenant = relationship("TenantModel")
     __table_args__ = (UniqueConstraint("tenant_id", "user_id", name="uq_membership_tenant_user"),)
 

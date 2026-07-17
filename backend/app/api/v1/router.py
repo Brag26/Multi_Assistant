@@ -37,6 +37,7 @@ from app.api.v1.outbound_webhooks import router as outbound_webhooks_router
 from app.api.v1.agent_performance import router as agent_performance_router
 from app.api.v1.billing import billing_router, public_router as billing_public_router, router as billing_webhooks_router, admin_router as billing_admin_router
 from app.api.v1.assistant_assignments import router as assistant_assignments_router
+from app.api.v1.settings import router as settings_router
 
 api_router = APIRouter()
 
@@ -85,3 +86,4 @@ api_router.include_router(billing_router)
 api_router.include_router(billing_webhooks_router)
 api_router.include_router(billing_admin_router)
 api_router.include_router(assistant_assignments_router)
+api_router.include_router(settings_router)

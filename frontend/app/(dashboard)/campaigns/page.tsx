@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
-import { listCampaigns, campaignAction, type Campaign } from "@/lib/api";
+import { listCampaigns, campaignAction, getMySettings, type Campaign } from "@/lib/api";
+import { detectBrowserTimezone, formatInTimezone } from "@/lib/timezones";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,12 @@ export default function CampaignsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [newCampaignOpen, setNewCampaignOpen] = useState(false);
+  const [displayTz, setDisplayTz] = useState(detectBrowserTimezone());
+
+  useEffect(() => {
+    if (!tenantId) return;
+    getMySettings(tenantId).then((res) => { if (res.timezone) setDisplayTz(res.timezone); }).catch(() => {});
+  }, [tenantId]);
 
   const { data: campaigns = [], isLoading } = useQuery<Campaign[]>({
     queryKey: ["campaigns", tenantId],
@@ -96,7 +103,7 @@ export default function CampaignsPage() {
                     {c.scheduled_at && (
                       <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-400">
                         <Clock className="w-3 h-3" />
-                        Scheduled for {new Date(c.scheduled_at).toLocaleString()}
+                        Scheduled for {formatInTimezone(c.scheduled_at, displayTz)} ({displayTz})
                       </div>
                     )}
                   </div>

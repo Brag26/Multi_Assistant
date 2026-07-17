@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Megaphone, X, Search } from "lucide-react";
-import { listMyAssistants, listContacts, createCampaign, campaignAction, type Contact } from "@/lib/api";
+import { listMyAssistants, listContacts, createCampaign, campaignAction, getMySettings, type Contact } from "@/lib/api";
+import { COMMON_TIMEZONES, detectBrowserTimezone, zonedDateTimeToUtcISOString } from "@/lib/timezones";
 
 interface Props {
   tenantId: string;
@@ -20,6 +21,7 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [startMode, setStartMode] = useState<"now" | "later">("now");
   const [scheduledAt, setScheduledAt] = useState("");
+  const [timezone, setTimezone] = useState(detectBrowserTimezone());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +30,7 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
     setError(null);
     listMyAssistants(tenantId).then(setAssistants).catch(() => {});
     listContacts(tenantId).then(setContacts).catch(() => {});
+    getMySettings(tenantId).then((res) => { if (res.timezone) setTimezone(res.timezone); }).catch(() => {});
   }, [open, tenantId]);
 
   useEffect(() => {
@@ -55,7 +58,7 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
         name,
         vapi_assistant_id: assistantId,
         contact_ids: Array.from(selectedContacts),
-        scheduled_at: startMode === "later" && scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        scheduled_at: startMode === "later" && scheduledAt ? zonedDateTimeToUtcISOString(scheduledAt, timezone) : null,
       });
       if (startMode === "now") {
         await campaignAction(tenantId, campaign.id, "launch");
@@ -135,8 +138,16 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
               </button>
             </div>
             {startMode === "later" && (
-              <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
-                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm" />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
+                  className="border border-slate-200 rounded-md px-3 py-2 text-sm" />
+                <select value={timezone} onChange={(e) => setTimezone(e.target.value)}
+                  className="border border-slate-200 rounded-md px-2 py-2 text-xs">
+                  {(COMMON_TIMEZONES.includes(timezone) ? COMMON_TIMEZONES : [timezone, ...COMMON_TIMEZONES]).map((tz) => (
+                    <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
 
