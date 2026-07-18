@@ -122,13 +122,17 @@ class CampaignService:
         self._can_manage(user, tenant_id)
         return await self.campaigns.clone(tenant_id, campaign_id)
 
-    async def launch_now(self, user: Principal, tenant_id: str, campaign_id: UUID):
-        """Start dialing immediately instead of waiting for the campaign's
-        scheduled_at (or for one to be set at all)."""
+    async def launch_now(self, user: Principal, tenant_id: str, campaign_id: UUID, background_tasks=None):
+        """Start dialing immediately. Dials directly via Vapi in the background
+        of this request — does NOT depend on a separate Celery worker/broker,
+        since that infra often isn't deployed. Skips numbers on the DNC list."""
         self._can_manage(user, tenant_id)
         campaign = await self.campaigns.set_status(tenant_id, campaign_id, CampaignStatus.RUNNING)
-        from app.workers.scheduler import launch_campaign_calls
-        launch_campaign_calls.delay(str(campaign_id), tenant_id)
+        if background_tasks is not None:
+            background_tasks.add_task(_dial_campaign_now, str(campaign_id), tenant_id)
+        else:
+            import asyncio
+            asyncio.create_task(_dial_campaign_now(str(campaign_id), tenant_id))
         return campaign
 
     def _can_manage(self, user: Principal, tenant_id: str) -> None:
@@ -196,3 +200,82 @@ class IntegrationService:
         require_tenant_access(user, tenant_id)
         if user.role not in {Role.SUPER_ADMIN, Role.TENANT_ADMIN}:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot manage integrations")
+
+
+async def _dial_campaign_now(campaign_id: str, tenant_id: str) -> None:
+    """Runs in the background after 'Start Now' — dials every contact
+    attached to the campaign via Vapi directly (no Celery dependency)."""
+    import structlog
+    from sqlalchemy import select
+    from app.domain.enums import CallStatus, CampaignStatus
+    from app.infrastructure.db.models import CallModel, CampaignContactModel, CampaignModel, ContactModel, DncListModel
+    from app.infrastructure.db.session import SessionLocal
+    from app.infrastructure.integrations.vapi import VapiClient
+
+    log = structlog.get_logger()
+    vapi = VapiClient()
+
+    async with SessionLocal() as session:
+        campaign = await session.get(CampaignModel, campaign_id)
+        if not campaign:
+            log.warning("campaign.launch_now.not_found", campaign_id=campaign_id)
+            return
+        if not campaign.vapi_assistant_id:
+            log.warning("campaign.launch_now.no_assistant", campaign_id=campaign_id)
+            campaign.status = CampaignStatus.COMPLETED
+            await session.commit()
+            return
+
+        from app.infrastructure.db.models import AssistantAssignmentModel
+        from_number = campaign.twilio_phone_number
+        if not from_number:
+            assignment_result = await session.execute(
+                select(AssistantAssignmentModel.phone_number).where(
+                    AssistantAssignmentModel.tenant_id == tenant_id,
+                    AssistantAssignmentModel.assistant_external_id == campaign.vapi_assistant_id,
+                ).limit(1)
+            )
+            from_number = assignment_result.scalar_one_or_none()
+
+        contacts_result = await session.execute(
+            select(ContactModel)
+            .join(CampaignContactModel, CampaignContactModel.contact_id == ContactModel.id)
+            .where(CampaignContactModel.campaign_id == campaign_id)
+        )
+        contacts = contacts_result.scalars().all()
+
+        dnc_result = await session.execute(select(DncListModel.phone).where(DncListModel.tenant_id == tenant_id))
+        dnc_phones = {row[0] for row in dnc_result.all()}
+
+        queued = 0
+        for contact in contacts:
+            if contact.phone in dnc_phones:
+                continue
+            call = CallModel(
+                tenant_id=tenant_id,
+                campaign_id=campaign_id,
+                contact_id=contact.id,
+                customer_phone=contact.phone,
+                assistant_id=campaign.vapi_assistant_id,
+                from_phone_number=from_number,
+                status=CallStatus.QUEUED,
+            )
+            session.add(call)
+            await session.flush()
+            try:
+                provider_call_id = await vapi.start_call(
+                    contact.phone, campaign.vapi_assistant_id,
+                    {"call_id": str(call.id), "campaign_id": campaign_id},
+                )
+                call.provider_call_id = provider_call_id
+                call.status = CallStatus.IN_PROGRESS
+                queued += 1
+            except Exception as exc:
+                call.status = CallStatus.FAILED
+                log.warning("campaign.launch_now.dial_failed", contact_id=str(contact.id), error=str(exc))
+            await session.commit()
+
+        if queued == 0:
+            campaign.status = CampaignStatus.COMPLETED
+            await session.commit()
+        log.info("campaign.launch_now.done", campaign_id=campaign_id, queued=queued)

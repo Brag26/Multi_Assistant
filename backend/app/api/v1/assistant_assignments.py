@@ -64,6 +64,7 @@ async def list_assistants_for_me(
                 holders.append({
                     "assignment_id": a.id, "user_id": a.assigned_to_user_id,
                     "email": info["email"], "display_name": info["display_name"], "role": info["role"],
+                    "phone_number": a.phone_number,
                 })
             out.append({
                 "external_id": asset.external_id, "label": asset.label,
@@ -81,7 +82,7 @@ async def list_assistants_for_me(
         )
     )
     return [
-        {"external_id": a.assistant_external_id, "label": a.assistant_label, "assignment_id": a.id}
+        {"external_id": a.assistant_external_id, "label": a.assistant_label, "assignment_id": a.id, "phone_number": a.phone_number}
         for a in result.scalars().all()
     ]
 
@@ -90,6 +91,7 @@ class AssignAssistantRequest(BaseModel):
     assistant_external_id: str
     assistant_label: str
     assigned_to_user_id: str
+    phone_number: str | None = None
 
 
 @router.post("/assign")
@@ -135,13 +137,17 @@ async def assign_assistant(
             AssistantAssignmentModel.assigned_to_user_id == body.assigned_to_user_id,
         )
     )
-    if existing.scalar_one_or_none():
+    existing_row = existing.scalar_one_or_none()
+    if existing_row:
+        if body.phone_number is not None:
+            existing_row.phone_number = body.phone_number
+            await session.commit()
         return {"ok": True, "note": "already assigned"}
 
     session.add(AssistantAssignmentModel(
         id=str(uuid4()), tenant_id=tenant_id, assistant_external_id=body.assistant_external_id,
         assistant_label=body.assistant_label, assigned_to_user_id=body.assigned_to_user_id,
-        assigned_by_user_id=user.user_id,
+        assigned_by_user_id=user.user_id, phone_number=body.phone_number,
     ))
     await session.commit()
     return {"ok": True}
@@ -175,3 +181,36 @@ async def revoke_assistant_assignment(
     await session.delete(assignment)
     await session.commit()
     return {"ok": True}
+
+
+@router.get("/phone-usage")
+async def phone_number_usage(
+    tenant_id: str,
+    user: CurrentUser,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Call volume and minutes per phone number, so superadmin can see how
+    heavily each assigned number is being used."""
+    require_tenant_access(user, tenant_id)
+    if user.role != Role.SUPER_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only superadmin can view phone usage")
+
+    result = await session.execute(text("""
+        SELECT
+            from_phone_number,
+            COUNT(*) AS call_count,
+            COALESCE(SUM(duration_seconds), 0) AS total_seconds
+        FROM voice_calls
+        WHERE tenant_id = :tid AND from_phone_number IS NOT NULL
+        GROUP BY from_phone_number
+        ORDER BY call_count DESC
+    """), {"tid": tenant_id})
+    rows = result.mappings().all()
+    return [
+        {
+            "phone_number": r["from_phone_number"],
+            "call_count": r["call_count"],
+            "total_minutes": round((r["total_seconds"] or 0) / 60, 1),
+        }
+        for r in rows
+    ]

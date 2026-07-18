@@ -53,24 +53,37 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
     if (!name || !assistantId || selectedContacts.size === 0) return;
     setSaving(true);
     setError(null);
+    let campaign;
     try {
-      const campaign = await createCampaign(tenantId, {
+      campaign = await createCampaign(tenantId, {
         name,
         vapi_assistant_id: assistantId,
         contact_ids: Array.from(selectedContacts),
         scheduled_at: startMode === "later" && scheduledAt ? zonedDateTimeToUtcISOString(scheduledAt, timezone) : null,
       });
-      if (startMode === "now") {
-        await campaignAction(tenantId, campaign.id, "launch");
-      }
-      onCreated?.();
-      onClose();
-      setName(""); setAssistantId(""); setSelectedContacts(new Set()); setStartMode("now"); setScheduledAt("");
     } catch (err: any) {
       setError(err?.message || "Couldn't create the campaign.");
-    } finally {
       setSaving(false);
+      return;
     }
+
+    // Campaign now exists regardless of what happens next — always refresh
+    // the list and reset the form so the user sees it and isn't left with a
+    // stale/confusing modal state.
+    onCreated?.();
+    setName(""); setAssistantId(""); setSelectedContacts(new Set()); setStartMode("now"); setScheduledAt("");
+
+    if (startMode === "now") {
+      try {
+        await campaignAction(tenantId, campaign.id, "launch");
+      } catch (err: any) {
+        setSaving(false);
+        setError((err?.message || "Campaign was created, but couldn't start dialing.") + " You can retry from the campaign list using the launch button.");
+        return;
+      }
+    }
+    setSaving(false);
+    onClose();
   }
 
   if (!open) return null;
@@ -104,9 +117,23 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
           </div>
 
           <div>
-            <label className="block text-xs text-slate-500 mb-1">
-              Contacts ({selectedContacts.size} selected)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-slate-500">
+                Contacts ({selectedContacts.size} selected)
+              </label>
+              <button
+                onClick={() => {
+                  if (selectedContacts.size === contacts.length) {
+                    setSelectedContacts(new Set());
+                  } else {
+                    setSelectedContacts(new Set(contacts.map((c) => c.id)));
+                  }
+                }}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                {selectedContacts.size === contacts.length && contacts.length > 0 ? "Clear All" : "Select All"}
+              </button>
+            </div>
             <div className="relative mb-2">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search contacts…"

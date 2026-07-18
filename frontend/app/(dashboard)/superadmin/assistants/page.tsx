@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Mic, UserPlus, X, RefreshCw } from "lucide-react";
+import { ArrowLeft, Mic, UserPlus, X, RefreshCw, Phone, BarChart2 } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 import { adminListAccounts, type AdminAccount } from "@/lib/api-billing";
-import { refreshVapiAssistants } from "@/lib/api";
+import { refreshVapiAssistants, listAssets, type IntegrationAsset } from "@/lib/api";
 
 interface AssistantHolder {
   assignment_id: string;
@@ -14,6 +14,7 @@ interface AssistantHolder {
   email: string | null;
   display_name: string | null;
   role: string | null;
+  phone_number: string | null;
 }
 interface Assistant {
   external_id: string;
@@ -22,17 +23,26 @@ interface Assistant {
   model?: string | null;
   assigned_to: AssistantHolder[];
 }
+interface PhoneUsage {
+  phone_number: string;
+  call_count: number;
+  total_minutes: number;
+}
 
 export default function SuperadminAssistantsPage() {
   const tenantId = useSessionStore((s) => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
+  const [phoneNumbers, setPhoneNumbers] = useState<IntegrationAsset[]>([]);
+  const [usage, setUsage] = useState<PhoneUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [assigning, setAssigning] = useState<Assistant | null>(null);
   const [pickedUser, setPickedUser] = useState("");
+  const [pickedPhone, setPickedPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [showUsage, setShowUsage] = useState(false);
 
   async function handleSync() {
     setSyncing(true);
@@ -56,15 +66,21 @@ export default function SuperadminAssistantsPage() {
     setError(null);
     try {
       const token = await getToken();
-      const [assistantsRes, accountList] = await Promise.all([
+      const [assistantsRes, accountList, numbers, usageRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/tenants/${tenantId}/assistants`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         adminListAccounts(),
+        listAssets(tenantId, "twilio").catch(() => []),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/tenants/${tenantId}/assistants/phone-usage`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then((r) => (r.ok ? r.json() : [])),
       ]);
       if (!assistantsRes.ok) throw new Error("Failed to load assistants");
       setAssistants(await assistantsRes.json());
       setAccounts(accountList);
+      setPhoneNumbers(numbers);
+      setUsage(usageRes);
     } catch (err: any) {
       setError(err?.message || "Couldn't load assistants.");
     } finally {
@@ -77,6 +93,7 @@ export default function SuperadminAssistantsPage() {
   function openAssign(a: Assistant) {
     setAssigning(a);
     setPickedUser("");
+    setPickedPhone("");
   }
 
   async function submitAssign() {
@@ -91,6 +108,7 @@ export default function SuperadminAssistantsPage() {
           assistant_external_id: assigning.external_id,
           assistant_label: assigning.label,
           assigned_to_user_id: pickedUser,
+          phone_number: pickedPhone || null,
         }),
       });
       setAssigning(null);
@@ -126,14 +144,52 @@ export default function SuperadminAssistantsPage() {
             <Mic className="w-5 h-5 text-indigo-600" /> Manage Assistants
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Assign Vapi assistants to resellers or clients. Resellers can only re-assign what you've given them.
+            Assign Vapi assistants (and optionally a phone number) to resellers or clients.
           </p>
         </div>
-        <button onClick={handleSync} disabled={syncing}
-          className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 shrink-0">
-          <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Syncing…" : "Sync from Vapi"}
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => setShowUsage((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50">
+            <BarChart2 className="w-4 h-4" /> {showUsage ? "Hide" : "Phone"} Usage
+          </button>
+          <button onClick={handleSync} disabled={syncing}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Syncing…" : "Sync from Vapi"}
+          </button>
+        </div>
       </div>
+
+      {showUsage && (
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5" /> Phone Number Usage
+            </p>
+          </div>
+          {usage.length === 0 ? (
+            <p className="text-sm text-slate-400 px-4 py-4">No calls placed from an assigned number yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
+                  <th className="px-4 py-2 font-medium">Phone Number</th>
+                  <th className="px-4 py-2 font-medium">Calls</th>
+                  <th className="px-4 py-2 font-medium">Minutes Used</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usage.map((u) => (
+                  <tr key={u.phone_number} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{u.phone_number}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{u.call_count}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{u.total_minutes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-slate-500">Loading…</p>
@@ -166,6 +222,11 @@ export default function SuperadminAssistantsPage() {
                     <span key={h.assignment_id}
                       className="flex items-center gap-1.5 text-xs bg-slate-100 text-slate-600 rounded-full pl-2.5 pr-1 py-1">
                       {h.display_name || h.email} · {h.role === "tenant_admin" ? "Reseller" : "Client"}
+                      {h.phone_number && (
+                        <span className="flex items-center gap-0.5 text-indigo-600">
+                          <Phone className="w-3 h-3" /> {h.phone_number}
+                        </span>
+                      )}
                       <button onClick={() => revoke(h.assignment_id)} disabled={saving}
                         className="hover:bg-slate-200 rounded-full p-0.5">
                         <X className="w-3 h-3" />
@@ -185,7 +246,7 @@ export default function SuperadminAssistantsPage() {
             <h3 className="font-semibold mb-3">Assign "{assigning.label}"</h3>
             <label className="block text-xs text-slate-500 mb-1">Assign to</label>
             <select
-              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm mb-4"
+              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm mb-3"
               value={pickedUser}
               onChange={(e) => setPickedUser(e.target.value)}
             >
@@ -196,6 +257,22 @@ export default function SuperadminAssistantsPage() {
                 </option>
               ))}
             </select>
+            <label className="block text-xs text-slate-500 mb-1">Phone number (optional — for usage tracking)</label>
+            <select
+              className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm mb-4"
+              value={pickedPhone}
+              onChange={(e) => setPickedPhone(e.target.value)}
+            >
+              <option value="">No specific number</option>
+              {phoneNumbers.map((p) => (
+                <option key={p.external_id} value={p.label}>{p.label}</option>
+              ))}
+            </select>
+            {phoneNumbers.length === 0 && (
+              <p className="text-xs text-slate-400 -mt-3 mb-4">
+                No Twilio numbers synced — connect Twilio and sync numbers in Setup Wizard to track usage per number.
+              </p>
+            )}
             <div className="flex gap-2">
               <button onClick={submitAssign} disabled={!pickedUser || saving}
                 className="flex-1 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50">

@@ -46,6 +46,7 @@ class SqlAlchemyCallRepository:
         request: LaunchCallRequest,
         assistant_id: str | None = None,
         initiated_by_user_id: str | None = None,
+        from_phone_number: str | None = None,
     ):
         call = CallModel(
             tenant_id=tenant_id,
@@ -54,6 +55,7 @@ class SqlAlchemyCallRepository:
             campaign_id=str(request.campaign_id) if request.campaign_id else None,
             assistant_id=assistant_id,
             customer_phone=request.customer_phone,
+            from_phone_number=from_phone_number,
             initiated_by_user_id=initiated_by_user_id,
             metadata_=request.metadata,
         )

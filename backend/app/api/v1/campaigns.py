@@ -1,6 +1,6 @@
 ﻿from typing import Annotated
 from uuid import UUID
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 
 from app.api.deps import campaign_service
 from app.application.module_services import CampaignService
@@ -38,6 +38,6 @@ async def clone_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, s
     return await service.clone(user, tenant_id, campaign_id)
 
 @router.post("/{campaign_id}/launch", response_model=CampaignRead)
-async def launch_campaign_now(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
+async def launch_campaign_now(tenant_id: str, campaign_id: UUID, user: CurrentUser, background_tasks: BackgroundTasks, service: Annotated[CampaignService, Depends(campaign_service)]):
     """Start dialing every attached contact right now, instead of waiting on scheduled_at."""
-    return await service.launch_now(user, tenant_id, campaign_id)
+    return await service.launch_now(user, tenant_id, campaign_id, background_tasks=background_tasks)

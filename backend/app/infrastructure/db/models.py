@@ -158,6 +158,7 @@ class AssistantAssignmentModel(Base):
     assistant_label: Mapped[str] = mapped_column(String(180), nullable=False)
     assigned_to_user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
     assigned_by_user_id: Mapped[str] = mapped_column(UUID(as_uuid=False))
+    phone_number: Mapped[str | None] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     __table_args__ = (UniqueConstraint("assistant_external_id", "assigned_to_user_id", name="uq_assistant_assignment"),)
 
@@ -292,6 +293,7 @@ class CallModel(Base):
     campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"), index=True)
     assistant_id: Mapped[str | None] = mapped_column(String(180))
     customer_phone: Mapped[str] = mapped_column(String(40), nullable=False)
+    from_phone_number: Mapped[str | None] = mapped_column(String(40), index=True)
     initiated_by_user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), index=True)
     status: Mapped[CallStatus] = mapped_column(
         Enum(CallStatus, values_callable=lambda e: [x.value for x in e], name="call_status"),
