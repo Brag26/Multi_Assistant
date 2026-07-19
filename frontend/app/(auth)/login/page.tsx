@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -61,10 +63,10 @@ export default function LoginPage() {
         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "linear-gradient(#6366f1 1px, transparent 1px), linear-gradient(90deg, #6366f1 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
         <div className="absolute top-1/4 left-1/4 w-72 h-72 rounded-full opacity-20 blur-3xl" style={{ background: "radial-gradient(circle, #6366f1, transparent)" }} />
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #6366f1, #a855f7)" }}>
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+          <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center shadow-lg">
+            <img src="/logo.jpeg" alt="Volant AI" className="w-full h-full object-cover" />
           </div>
-          <span className="text-white font-bold text-xl">VoiceOps</span>
+          <span className="text-white font-bold text-xl">Volant</span>
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(99,102,241,0.3)", color: "#a5b4fc" }}>AI</span>
         </div>
         <div className="relative z-10 space-y-6">
@@ -82,11 +84,11 @@ export default function LoginPage() {
             ))}
           </div>
           <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-            <p className="text-sm italic" style={{ color: "#94a3b8" }}>&ldquo;VoiceOps cut our lead response time from hours to seconds. Our conversion rate doubled.&rdquo;</p>
+            <p className="text-sm italic" style={{ color: "#94a3b8" }}>&ldquo;Volant cut our lead response time from hours to seconds. Our conversion rate doubled.&rdquo;</p>
             <p className="mt-2 text-xs font-semibold" style={{ color: "#6366f1" }}>— Sales Director, FinTech Co.</p>
           </div>
         </div>
-        <div className="relative z-10 text-xs" style={{ color: "#475569" }}>© 2026 VoiceOps · AI Voice Operations Platform</div>
+        <div className="relative z-10 text-xs" style={{ color: "#475569" }}>© 2026 Volant · AI Voice Operations Platform</div>
       </div>
 
       {/* Right panel */}
@@ -96,7 +98,7 @@ export default function LoginPage() {
           {mode === "login" && (
             <div>
               <h2 className="text-2xl font-bold text-slate-800">Welcome back</h2>
-              <p className="mt-1 text-sm text-slate-500">Sign in to your VoiceOps account</p>
+              <p className="mt-1 text-sm text-slate-500">Sign in to your Volant account</p>
 
               {/* Demo button */}
               <button onClick={handleTryDemo}
@@ -119,7 +121,13 @@ export default function LoginPage() {
                     <label className="block text-xs font-semibold text-slate-600">Password</label>
                     <button onClick={() => setMode("forgot")} className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">Forgot password?</button>
                   </div>
-                  <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handlePasswordLogin()} className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all" />
+                  <div className="relative">
+                    <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handlePasswordLogin()} className="w-full px-3.5 py-2.5 pr-10 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder-slate-400 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all" />
+                    <button type="button" onClick={() => setShowPassword(v => !v)} tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 {error && <div className="rounded-lg px-3.5 py-2.5 text-sm text-red-700 bg-red-50 border border-red-100">{error}</div>}
                 <button onClick={handlePasswordLogin} disabled={!email || !password || loading} className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-50" style={{ background: "linear-gradient(135deg, #6366f1, #7c3aed)" }}>

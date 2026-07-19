@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Megaphone, X, Search } from "lucide-react";
-import { listMyAssistants, listContacts, createCampaign, campaignAction, getMySettings, type Contact } from "@/lib/api";
+import { listMyAssistants, listContacts, createCampaign, updateCampaign, getCampaignContactIds, campaignAction, getMySettings, type Contact, type Campaign } from "@/lib/api";
 import { COMMON_TIMEZONES, detectBrowserTimezone, zonedDateTimeToUtcISOString } from "@/lib/timezones";
 
 interface Props {
@@ -10,9 +10,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCreated?: () => void;
+  editingCampaign?: Campaign | null;
 }
 
-export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) {
+export function NewCampaignModal({ tenantId, open, onClose, onCreated, editingCampaign }: Props) {
   const [assistants, setAssistants] = useState<{ external_id: string; label: string }[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState("");
@@ -31,7 +32,24 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
     listMyAssistants(tenantId).then(setAssistants).catch(() => {});
     listContacts(tenantId).then(setContacts).catch(() => {});
     getMySettings(tenantId).then((res) => { if (res.timezone) setTimezone(res.timezone); }).catch(() => {});
-  }, [open, tenantId]);
+
+    if (editingCampaign) {
+      setName(editingCampaign.name);
+      setAssistantId(editingCampaign.vapi_assistant_id ?? "");
+      if (editingCampaign.scheduled_at) {
+        setStartMode("later");
+        setScheduledAt(new Date(editingCampaign.scheduled_at).toISOString().slice(0, 16));
+      } else {
+        setStartMode("now");
+        setScheduledAt("");
+      }
+      getCampaignContactIds(tenantId, editingCampaign.id)
+        .then((ids) => setSelectedContacts(new Set(ids)))
+        .catch(() => {});
+    } else {
+      setName(""); setAssistantId(""); setSelectedContacts(new Set()); setStartMode("now"); setScheduledAt("");
+    }
+  }, [open, tenantId, editingCampaign]);
 
   useEffect(() => {
     if (!open || !tenantId) return;
@@ -53,6 +71,26 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
     if (!name || !assistantId || selectedContacts.size === 0) return;
     setSaving(true);
     setError(null);
+
+    if (editingCampaign) {
+      try {
+        await updateCampaign(tenantId, editingCampaign.id, {
+          name,
+          vapi_assistant_id: assistantId,
+          contact_ids: Array.from(selectedContacts),
+          scheduled_at: startMode === "later" && scheduledAt ? zonedDateTimeToUtcISOString(scheduledAt, timezone) : null,
+        });
+      } catch (err: any) {
+        setError(err?.message || "Couldn't save changes.");
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+      onCreated?.();
+      onClose();
+      return;
+    }
+
     let campaign;
     try {
       campaign = await createCampaign(tenantId, {
@@ -94,7 +132,7 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
         style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-            <Megaphone className="w-4 h-4 text-indigo-600" /> New Campaign
+            <Megaphone className="w-4 h-4 text-indigo-600" /> {editingCampaign ? "Edit Campaign" : "New Campaign"}
           </h3>
           <button onClick={onClose}><X className="w-4 h-4 text-slate-400" /></button>
         </div>
@@ -153,18 +191,22 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
           </div>
 
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Start</label>
-            <div className="flex gap-2 mb-2">
-              <button onClick={() => setStartMode("now")}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium ${startMode === "now" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"}`}>
-                Start Now
-              </button>
-              <button onClick={() => setStartMode("later")}
-                className={`flex-1 py-2 rounded-lg text-sm font-medium ${startMode === "later" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"}`}>
-                Schedule
-              </button>
-            </div>
-            {startMode === "later" && (
+            <label className="block text-xs text-slate-500 mb-1">
+              {editingCampaign ? "Scheduled time (optional)" : "Start"}
+            </label>
+            {!editingCampaign && (
+              <div className="flex gap-2 mb-2">
+                <button onClick={() => setStartMode("now")}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${startMode === "now" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                  Start Now
+                </button>
+                <button onClick={() => setStartMode("later")}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${startMode === "later" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                  Schedule
+                </button>
+              </div>
+            )}
+            {(startMode === "later" || editingCampaign) && (
               <div className="grid grid-cols-2 gap-2">
                 <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)}
                   className="border border-slate-200 rounded-md px-3 py-2 text-sm" />
@@ -182,10 +224,10 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated }: Props) 
 
           <button
             onClick={handleCreate}
-            disabled={!name || !assistantId || selectedContacts.size === 0 || saving || (startMode === "later" && !scheduledAt)}
+            disabled={!name || !assistantId || selectedContacts.size === 0 || saving || (!editingCampaign && startMode === "later" && !scheduledAt)}
             className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
           >
-            {saving ? "Creating…" : startMode === "now" ? "Create & Start Now" : "Create & Schedule"}
+            {saving ? "Saving…" : editingCampaign ? "Save Changes" : startMode === "now" ? "Create & Start Now" : "Create & Schedule"}
           </button>
         </div>
       </div>

@@ -42,6 +42,19 @@ class SqlAlchemyCampaignRepository:
             raise LookupError("Campaign not found")
         return campaign
 
+    async def delete(self, tenant_id: str, campaign_id: UUID) -> None:
+        campaign = await self.get(tenant_id, campaign_id)
+        await self.session.execute(delete(CampaignContactModel).where(CampaignContactModel.campaign_id == str(campaign_id)))
+        await self.session.delete(campaign)
+        await self.session.commit()
+
+    async def get_contact_ids(self, tenant_id: str, campaign_id: UUID) -> list[str]:
+        await self.get(tenant_id, campaign_id)  # 404s if not found/owned
+        result = await self.session.execute(
+            select(CampaignContactModel.contact_id).where(CampaignContactModel.campaign_id == str(campaign_id))
+        )
+        return [row[0] for row in result.all()]
+
     async def set_status(self, tenant_id: str, campaign_id: UUID, status: CampaignStatus):
         campaign = await self.get(tenant_id, campaign_id)
         campaign.status = status

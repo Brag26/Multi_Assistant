@@ -225,7 +225,7 @@ function ReportPreview({ config, analytics }: { config: ReportConfig; analytics:
         {/* Footer */}
         <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
           <p className="text-xs text-slate-400">
-            Powered by VoiceOps AI · {config.agencyName || "Your Agency"}
+            Powered by Volant AI · {config.agencyName || "Your Agency"}
           </p>
           <p className="text-xs text-slate-400">
             {new Date().toLocaleDateString()}

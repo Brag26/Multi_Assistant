@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useSessionStore } from "@/store/session";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import { Phone, Mic, Globe, RefreshCw, ExternalLink, Check, ChevronDown, ChevronUp, Zap } from "lucide-react";
+import { Phone, Mic, Globe, RefreshCw, ExternalLink, Check, ChevronDown, ChevronUp, Zap, ArrowLeft } from "lucide-react";
 
 type VapiAgent = {
   id: string;
@@ -96,6 +97,10 @@ function SuperadminAgentsView() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
+
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
@@ -354,6 +359,10 @@ function FilteredAgentsView({ isReseller }: { isReseller: boolean }) {
 
   return (
     <div className="p-6 max-w-4xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
+        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+      </Link>
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <Mic className="w-5 h-5 text-indigo-600" /> AI Voice Agents

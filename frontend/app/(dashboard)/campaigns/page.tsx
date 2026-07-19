@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
-import { listCampaigns, campaignAction, getMySettings, type Campaign } from "@/lib/api";
+import { listCampaigns, campaignAction, deleteCampaign, getMySettings, type Campaign } from "@/lib/api";
 import { detectBrowserTimezone, formatInTimezone } from "@/lib/timezones";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Megaphone, Pause, Play, Copy, X, Clock, BarChart2, Plus, Rocket } from "lucide-react";
+import { Megaphone, Pause, Play, Copy, X, Clock, BarChart2, Plus, Rocket, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { NewCampaignModal } from "@/components/dashboard/NewCampaignModal";
 
@@ -26,6 +26,7 @@ export default function CampaignsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [newCampaignOpen, setNewCampaignOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [displayTz, setDisplayTz] = useState(detectBrowserTimezone());
 
   useEffect(() => {
@@ -46,6 +47,11 @@ export default function CampaignsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["campaigns", tenantId] }),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteCampaign(tenantId, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["campaigns", tenantId] }),
+  });
+
   const filtered = statusFilter ? campaigns.filter(c => c.status === statusFilter) : campaigns;
 
   return (
@@ -61,7 +67,9 @@ export default function CampaignsPage() {
           <Plus className="w-3.5 h-3.5" /> New Campaign
         </Button>
       </div>
-      <NewCampaignModal tenantId={tenantId} open={newCampaignOpen} onClose={() => setNewCampaignOpen(false)}
+      <NewCampaignModal tenantId={tenantId} open={newCampaignOpen || Boolean(editingCampaign)}
+        onClose={() => { setNewCampaignOpen(false); setEditingCampaign(null); }}
+        editingCampaign={editingCampaign}
         onCreated={() => queryClient.invalidateQueries({ queryKey: ["campaigns", tenantId] })} />
 
       <div className="flex gap-1.5 mb-4 flex-wrap">
@@ -115,6 +123,13 @@ export default function CampaignsPage() {
                     </Link>
                     {(c.status === "draft" || c.status === "scheduled") && (
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-indigo-600"
+                        title="Edit"
+                        onClick={() => setEditingCampaign(c)}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    {(c.status === "draft" || c.status === "scheduled") && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-indigo-600"
                         title="Launch now"
                         onClick={() => actionMut.mutate({ id: c.id, action: "launch" })}>
                         <Rocket className="w-3.5 h-3.5" />
@@ -142,6 +157,17 @@ export default function CampaignsPage() {
                         title="Cancel"
                         onClick={() => actionMut.mutate({ id: c.id, action: "cancel" })}>
                         <X className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    {c.status !== "running" && (
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-red-500 hover:text-red-700"
+                        title="Delete"
+                        onClick={() => {
+                          if (window.confirm(`Delete campaign "${c.name}"? This can't be undone.`)) {
+                            deleteMut.mutate(c.id);
+                          }
+                        }}>
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     )}
                   </div>

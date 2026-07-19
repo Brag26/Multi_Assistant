@@ -291,6 +291,9 @@ export const listCallEvents = (tid: string, callId: string) => apiFetch<CallMoni
 // ─── Leads ────────────────────────────────────────────────────────────────────
 
 export const listContacts       = (tid: string, q = "") => apiFetch<Contact[]>(`/tenants/${tid}/contacts${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+export const updateContact      = (tid: string, id: string, data: Partial<Contact>) => apiFetch<Contact>(`/tenants/${tid}/contacts/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+export const deleteContact      = (tid: string, id: string) => apiFetch<void>(`/tenants/${tid}/contacts/${id}`, { method: "DELETE" });
+export const deleteContactsBulk = async (tid: string, ids: string[]) => { await Promise.all(ids.map((id) => deleteContact(tid, id))); };
 export const listLeadActivities = (tid: string, limit = 50) => apiFetch<LeadActivity[]>(`/tenants/${tid}/leads/activities?limit=${limit}`);
 export const listContactActivities = (tid: string, cid: string) => apiFetch<LeadActivity[]>(`/tenants/${tid}/leads/${cid}/activities`);
 
@@ -322,6 +325,10 @@ export const listCampaigns   = (tid: string) => apiFetch<Campaign[]>(`/tenants/$
 export const createCampaign  = (tid: string, data: { name: string; vapi_assistant_id: string; contact_ids: string[]; scheduled_at?: string | null }) =>
   apiFetch<Campaign>(`/tenants/${tid}/campaigns`, { method: "POST", body: JSON.stringify(data) });
 export const campaignAction  = (tid: string, cid: string, action: "pause" | "resume" | "cancel" | "clone" | "launch") => apiFetch<Campaign>(`/tenants/${tid}/campaigns/${cid}/${action}`, { method: "POST" });
+export const updateCampaign  = (tid: string, cid: string, data: { name?: string; vapi_assistant_id?: string; contact_ids?: string[]; scheduled_at?: string | null }) =>
+  apiFetch<Campaign>(`/tenants/${tid}/campaigns/${cid}`, { method: "PATCH", body: JSON.stringify(data) });
+export const deleteCampaign  = (tid: string, cid: string) => apiFetch<void>(`/tenants/${tid}/campaigns/${cid}`, { method: "DELETE" });
+export const getCampaignContactIds = (tid: string, cid: string) => apiFetch<string[]>(`/tenants/${tid}/campaigns/${cid}/contact-ids`);
 
 // ─── Integrations ─────────────────────────────────────────────────────────────
 

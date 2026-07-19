@@ -75,7 +75,7 @@ const INTEGRATIONS: Record<string, Category> = {
     label: "Calendar", emoji: "📅", color: "#ec4899",
     providers: [
       { id: "google_calendar", name: "Google Calendar", tag: "Most Popular", recommended: true, desc: "Automatically sync booked appointments from voice calls to your Google Calendar.", docsUrl: "https://calendar.google.com", fields: [], oauthFlow: true },
-      { id: "calendly", name: "Calendly", tag: "Booking Flow", desc: "Let callers book meetings directly. Sync Calendly events back to VoiceOps.", docsUrl: "https://calendly.com", fields: [{ key: "api_key", label: "Personal Access Token", placeholder: "eyJhbGci...", type: "password", hint: "calendly.com → Integrations → API & Webhooks" }] },
+      { id: "calendly", name: "Calendly", tag: "Booking Flow", desc: "Let callers book meetings directly. Sync Calendly events back to Volant.", docsUrl: "https://calendly.com", fields: [{ key: "api_key", label: "Personal Access Token", placeholder: "eyJhbGci...", type: "password", hint: "calendly.com → Integrations → API & Webhooks" }] },
     ],
   },
 };

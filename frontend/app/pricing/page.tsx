@@ -25,8 +25,9 @@ export default function PricingPage() {
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }} className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="font-bold text-slate-800 text-lg">
-            VoiceOps <span className="ml-1 text-[10px] font-semibold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full align-middle">AI</span>
+          <span className="font-bold text-slate-800 text-lg flex items-center gap-2">
+            <img src="/logo.jpeg" alt="Volant AI" className="w-7 h-7 rounded-lg object-cover" />
+            Volant <span className="ml-1 text-[10px] font-semibold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full align-middle">AI</span>
           </span>
           <Link href="/login" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">Sign in</Link>
         </div>

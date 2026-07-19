@@ -21,6 +21,14 @@ async def create_campaign(tenant_id: str, payload: CampaignCreate, user: Current
 async def update_campaign(tenant_id: str, campaign_id: UUID, payload: CampaignUpdate, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
     return await service.update_campaign(user, tenant_id, campaign_id, payload)
 
+@router.delete("/{campaign_id}", status_code=204)
+async def delete_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
+    await service.delete_campaign(user, tenant_id, campaign_id)
+
+@router.get("/{campaign_id}/contact-ids", response_model=list[str])
+async def get_campaign_contact_ids(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
+    return await service.get_campaign_contact_ids(user, tenant_id, campaign_id)
+
 @router.post("/{campaign_id}/pause", response_model=CampaignRead)
 async def pause_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
     return await service.pause(user, tenant_id, campaign_id)

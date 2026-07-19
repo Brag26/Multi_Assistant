@@ -118,7 +118,7 @@ function ClientBillingView() {
         amount: checkout.amount,
         currency: checkout.currency,
         order_id: checkout.order_id,
-        name: "VoiceOps",
+        name: "Volant",
         description: `${plan} plan subscription`,
         method: { upi: true, card: true, netbanking: true, wallet: false },
         handler: async (response: any) => {
@@ -155,7 +155,7 @@ function ClientBillingView() {
         amount: checkout.amount,
         currency: checkout.currency,
         order_id: checkout.order_id,
-        name: "VoiceOps",
+        name: "Volant",
         description: "Extra minutes top-up",
         method: { upi: true, card: true, netbanking: true, wallet: false },
         handler: async (response: any) => {

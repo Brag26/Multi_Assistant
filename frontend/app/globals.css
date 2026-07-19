@@ -11,7 +11,33 @@
   --primary: 221 83% 53%;
 }
 
+.dark {
+  --background: 222 47% 8%;
+  --foreground: 210 20% 92%;
+  --card: 222 40% 12%;
+  --muted: 215 16% 65%;
+  --border: 217 33% 20%;
+  --primary: 221 83% 65%;
+}
+
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
+}
+
+/* Safety net: many dashboard pages hardcode text-slate-800/900 for headings
+   without a paired dark: variant. Rather than patch every page, invert those
+   specific shades to a light, readable tone whenever dark mode is active.
+   Specificity here matches Tailwind's own dark: utilities (two classes), so
+   any component that already sets an explicit dark: color keeps working —
+   this only fills the gap where nothing was set at all. */
+.dark .text-slate-800,
+.dark .text-slate-900 {
+  color: hsl(210 20% 92%);
+}
+.dark .text-slate-700 {
+  color: hsl(215 20% 80%);
+}
+.dark .bg-white {
+  background-color: hsl(var(--card));
 }

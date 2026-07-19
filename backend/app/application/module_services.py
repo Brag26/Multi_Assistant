@@ -106,6 +106,14 @@ class CampaignService:
         self._can_manage(user, tenant_id)
         return await self.campaigns.update(tenant_id, campaign_id, data)
 
+    async def delete_campaign(self, user: Principal, tenant_id: str, campaign_id: UUID):
+        self._can_manage(user, tenant_id)
+        await self.campaigns.delete(tenant_id, campaign_id)
+
+    async def get_campaign_contact_ids(self, user: Principal, tenant_id: str, campaign_id: UUID):
+        require_tenant_access(user, tenant_id)
+        return await self.campaigns.get_contact_ids(tenant_id, campaign_id)
+
     async def pause(self, user: Principal, tenant_id: str, campaign_id: UUID):
         self._can_manage(user, tenant_id)
         return await self.campaigns.set_status(tenant_id, campaign_id, CampaignStatus.PAUSED)

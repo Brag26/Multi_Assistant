@@ -86,9 +86,50 @@ function buildWorkflow(answers: Record<string, string>) {
   const mainX = 200;
   const rightX = 400;
 
+  // Maps our loose node "type" strings to the backend's required category +
+  // (for logic nodes) the corresponding logic_type enum value.
+  const CATEGORY_BY_TYPE: Record<string, string> = {
+    trigger: "trigger",
+    start_vapi_call: "action",
+    action: "action",
+    wait: "logic",
+    if_else: "logic",
+    stop_workflow: "logic",
+  };
+  const LOGIC_TYPE_BY_NODE_TYPE: Record<string, string> = {
+    wait: "wait",
+    if_else: "if_else",
+    stop_workflow: "stop_workflow",
+  };
+  // action_type must be one of the backend's WorkflowActionType values —
+  // anything not in this set gets normalized to send_webhook, with the
+  // original intent preserved in config.
+  const VALID_ACTION_TYPES = new Set([
+    "start_vapi_call", "end_call", "transfer_call", "update_contact",
+    "change_lead_status", "add_note", "trigger_make_scenario",
+    "send_webhook", "send_email_notification", "delay", "retry",
+  ]);
+
   const addNode = (type: string, label: string, x: number, y: number, extra: Record<string, unknown> = {}) => {
     const id = `node_${++nodeCount}`;
-    nodes.push({ id, type, position: { x, y }, data: { label, ...extra } });
+    const category = CATEGORY_BY_TYPE[type] ?? "action";
+    const { trigger_type, cron_expression, action_type, description, ...rest } = extra as Record<string, unknown>;
+
+    const data: Record<string, unknown> = { label, category, config: rest };
+    if (category === "trigger" && trigger_type) data.trigger_type = trigger_type;
+    if (cron_expression) data.cron_expression = cron_expression;
+    if (description) data.description = description;
+
+    if (category === "action") {
+      const requested = type === "start_vapi_call" ? "start_vapi_call" : (action_type as string) || "send_webhook";
+      data.action_type = VALID_ACTION_TYPES.has(requested) ? requested : "send_webhook";
+      if (!VALID_ACTION_TYPES.has(requested)) (data.config as Record<string, unknown>).intended_action = requested;
+    }
+    if (category === "logic") {
+      data.logic_type = LOGIC_TYPE_BY_NODE_TYPE[type] ?? "if_else";
+    }
+
+    nodes.push({ id, type, position: { x, y }, data });
     return id;
   };
 
@@ -108,13 +149,15 @@ function buildWorkflow(answers: Record<string, string>) {
     custom: "Hi, this is [Agent Name] calling from [Company]. I'm reaching out about [Purpose]. Do you have a moment to talk?",
   };
 
-  // Trigger type mapping
+  // Trigger type mapping — must match backend WorkflowTriggerType enum exactly.
+  // There's no dedicated "cron"/manual type; both map to campaign_started,
+  // with any schedule intent kept in the node's config instead.
   const triggerTypeMap: Record<string, string> = {
-    manual: "campaign_start",
+    manual: "campaign_started",
     new_contact: "incoming_make_webhook",
     webhook: "incoming_make_webhook",
-    scheduled: "cron",
-    call_outcome: "campaign_start",
+    scheduled: "campaign_started",
+    call_outcome: "call_completed",
   };
 
   // Step 1: Trigger
@@ -258,6 +301,7 @@ export default function WorkflowWizardPage() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [customName, setCustomName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
 
   const step = STEPS[currentStep];
@@ -287,20 +331,21 @@ export default function WorkflowWizardPage() {
   async function handleCreate() {
     if (!allAnswered) return;
     setCreating(true);
+    setCreateError(null);
     try {
       const { name, nodes, edges } = buildWorkflow(allAnswers);
       const wf = await createWorkflow(tenantId, {
         name,
         description: `Auto-generated via Smart Wizard`,
-        status: "draft" as const,
         trigger_type: (nodes[0] as { data: { trigger_type: string } }).data.trigger_type as never,
         nodes: nodes as never,
         edges: edges as never,
         config: { wizard_answers: allAnswers, auto_generated: true },
       });
       router.push(`/workflows?open=${wf.id}`);
-    } catch {
+    } catch (err: any) {
       setCreating(false);
+      setCreateError(err?.message || "Couldn't build the workflow. Please try again.");
     }
   }
 
@@ -420,6 +465,9 @@ export default function WorkflowWizardPage() {
           </button>
 
           <div className="flex items-center gap-3">
+            {createError && (
+              <p className="text-xs text-red-600 max-w-xs">{createError}</p>
+            )}
             {allAnswered && (
               <button onClick={() => setPreview(!preview)}
                 className="px-4 py-2.5 rounded-lg text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors">

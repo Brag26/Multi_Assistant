@@ -626,7 +626,7 @@ function ClientReportPreview({ config, analytics }: { config: ReportConfig; anal
           </div>
         )}
         <div className="pt-3 border-t border-slate-100 flex justify-between">
-          <p className="text-xs text-slate-400">Powered by VoiceOps AI · {config.agencyName || "Your Agency"}</p>
+          <p className="text-xs text-slate-400">Powered by Volant AI · {config.agencyName || "Your Agency"}</p>
           <p className="text-xs text-slate-400">{new Date().toLocaleDateString()}</p>
         </div>
       </div>
