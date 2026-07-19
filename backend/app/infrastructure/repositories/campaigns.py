@@ -48,7 +48,7 @@ class SqlAlchemyCampaignRepository:
         await self.session.delete(campaign)
         await self.session.commit()
 
-    async def get_contact_ids(self, tenant_id: str, campaign_id: UUID) -> list[str]:
+    async def get_contact_ids(self, tenant_id: str, campaign_id: UUID) -> List[str]:
         await self.get(tenant_id, campaign_id)  # 404s if not found/owned
         result = await self.session.execute(
             select(CampaignContactModel.contact_id).where(CampaignContactModel.campaign_id == str(campaign_id))
