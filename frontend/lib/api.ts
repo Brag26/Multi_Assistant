@@ -155,6 +155,8 @@ export interface CallRecord {
   status: CallStatus;
   outcome: string;
   duration_seconds?: number | null;
+  transcript?: string | null;
+  transcript_url?: string | null;
   recording_url?: string | null;
   summary?: string | null;
   structured_data?: Record<string, unknown> | null;
