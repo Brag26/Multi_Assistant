@@ -2,7 +2,7 @@
 from pydantic import BaseModel
 
 from app.api.deps import SessionDep, call_service
-from app.application.module_services import CallService
+from app.application.services import CallService
 from app.application.schemas import CallRead
 from app.core.security import CurrentUser, require_tenant_access
 from app.infrastructure.integrations.vapi import VapiClient

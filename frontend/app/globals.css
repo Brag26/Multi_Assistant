@@ -41,3 +41,17 @@ body {
 .dark .bg-white {
   background-color: hsl(var(--card));
 }
+
+/* Form fields (input/select/textarea) keep their white/light background in
+   both themes — only the page around them goes dark. Without this, they
+   inherit the light body text color set above for dark mode, making typed
+   text and dropdown values invisible against the still-white field. */
+.dark input,
+.dark select,
+.dark textarea {
+  color: hsl(222 47% 11%);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: hsl(215 16% 55%);
+}
