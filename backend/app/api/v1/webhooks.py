@@ -16,6 +16,43 @@ from app.api.v1.billing import record_usage
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 log = structlog.get_logger()
 
+
+def _resolve_call_outcome(success_eval, structured_data: dict | None, transcript: str) -> CallOutcome:
+    """Prefer Vapi's own analysis (successEvaluation / structuredData) over
+    guessing from the raw transcript. Vapi's successEvaluation is whatever
+    rubric the assistant is configured with — usually boolean-ish or a
+    short verdict string — so we check it first, then look for common
+    structured-data field names an assistant's schema might use, and only
+    fall back to keyword-matching the transcript as a last resort."""
+    if success_eval is not None:
+        val = str(success_eval).strip().lower()
+        if val in ("true", "yes", "pass", "passed", "qualified", "success", "successful", "1"):
+            return CallOutcome.QUALIFIED
+        if val in ("false", "no", "fail", "failed", "not qualified", "unsuccessful", "0"):
+            return CallOutcome.NOT_INTERESTED
+
+    if structured_data:
+        for key in ("qualified", "is_qualified", "interested", "is_interested"):
+            if key in structured_data:
+                return CallOutcome.QUALIFIED if structured_data[key] else CallOutcome.NOT_INTERESTED
+        for key in ("callback_requested", "wants_callback", "callback"):
+            if structured_data.get(key):
+                return CallOutcome.CALLBACK_REQUESTED
+        for key in ("escalate", "escalated", "needs_escalation"):
+            if structured_data.get(key):
+                return CallOutcome.ESCALATED
+        for key in ("not_interested", "declined"):
+            if structured_data.get(key):
+                return CallOutcome.NOT_INTERESTED
+
+    lowered = (transcript or "").lower()
+    if "not interested" in lowered or "no thanks" in lowered:
+        return CallOutcome.NOT_INTERESTED
+    if "qualified" in lowered or "interest" in lowered:
+        return CallOutcome.QUALIFIED
+    return CallOutcome.UNKNOWN
+
+
 @router.post("/vapi")
 async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | None = None):
     payload = await request.json()
@@ -79,7 +116,7 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
             
             if ended_reason in ["normal", "customer-hung-up", "agent-hung-up"]:
                 db_call.status = CallStatus.COMPLETED
-                db_call.outcome = CallOutcome.QUALIFIED if "qualified" in transcript.lower() or "interest" in transcript.lower() else CallOutcome.UNKNOWN
+                db_call.outcome = _resolve_call_outcome(success_eval, db_call.structured_data, transcript)
             else:
                 db_call.status = CallStatus.FAILED
                 db_call.outcome = CallOutcome.FAILED

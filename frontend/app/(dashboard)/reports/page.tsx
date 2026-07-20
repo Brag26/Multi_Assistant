@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
 import { listCampaigns, getAnalytics, type Campaign } from "@/lib/api";
-import { getCampaignReport, exportCampaignCsv, type CampaignReport } from "@/lib/api-features";
+import { getCampaignReport, downloadCampaignCsv, type CampaignReport } from "@/lib/api-features";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { BarChart2, Download, PhoneCall, Target, Clock, TrendingUp, PieChart as PieIcon, FileBarChart, Share2, Check, Settings } from "lucide-react";
@@ -59,6 +59,8 @@ export default function ReportsPage() {
   const tenantId = useSessionStore(s => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
   const [tab, setTab] = useState<"campaigns" | "roi" | "client">("campaigns");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [roiConfig, setRoiConfig] = useState<ROIConfig>(DEFAULT_ROI);
   const [reportConfig, setReportConfig] = useState<ReportConfig>(DEFAULT_REPORT);
   const [showROIConfig, setShowROIConfig] = useState(false);
@@ -181,11 +183,25 @@ export default function ReportsPage() {
                 </div>
               ) : report ? (
                 <div className="space-y-4">
-                  <div className="flex justify-end">
-                    <a href={exportCampaignCsv(tenantId, selectedId!)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
-                      <Download className="w-4 h-4" /> Export CSV
-                    </a>
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      onClick={async () => {
+                        setExporting(true);
+                        setExportError(null);
+                        try {
+                          await downloadCampaignCsv(tenantId, selectedId!);
+                        } catch (err: any) {
+                          setExportError(err?.message || "Couldn't export CSV.");
+                        } finally {
+                          setExporting(false);
+                        }
+                      }}
+                      disabled={exporting}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" /> {exporting ? "Exporting…" : "Export CSV"}
+                    </button>
+                    {exportError && <p className="text-xs text-red-600">{exportError}</p>}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <StatCard icon={<PhoneCall className="w-4 h-4" />} label="Total calls" value={report.total_calls} color="blue" />

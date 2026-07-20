@@ -5,6 +5,7 @@ api/v1/features.py — New feature endpoints:
 """
 import csv
 import io
+import json
 from typing import Annotated
 from uuid import UUID
 
@@ -295,10 +296,11 @@ async def export_campaign_csv(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["id", "phone", "status", "outcome", "duration_seconds",
-                     "started_at", "ended_at", "summary"])
+    writer.writerow(["id", "phone", "status", "outcome", "success_evaluation", "structured_data",
+                     "duration_seconds", "started_at", "ended_at", "summary"])
     for c in calls:
-        writer.writerow([c.id, c.customer_phone, c.status, c.outcome,
+        writer.writerow([c.id, c.customer_phone, c.status, c.outcome, c.success_evaluation,
+                         json.dumps(c.structured_data) if c.structured_data else "",
                          c.duration_seconds, c.started_at, c.ended_at, c.summary])
     output.seek(0)
 

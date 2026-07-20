@@ -65,8 +65,24 @@ export interface CampaignReport {
 
 export const getCampaignReport = (tid: string, cid: string) =>
   apiFetch<CampaignReport>(`/tenants/${tid}/campaigns/${cid}/report`);
-export const exportCampaignCsv = (tid: string, cid: string) =>
-  `${process.env.NEXT_PUBLIC_API_URL}/tenants/${tid}/campaigns/${cid}/export/csv`;
+
+export async function downloadCampaignCsv(tid: string, cid: string, filename?: string) {
+  const { authHeaders } = await import("./api");
+  const { Authorization } = await authHeaders();
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tenants/${tid}/campaigns/${cid}/export/csv`, {
+    headers: Authorization ? { Authorization } : {},
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || `campaign_${cid}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 // ── Slack ─────────────────────────────────────────────────────────────────────
 

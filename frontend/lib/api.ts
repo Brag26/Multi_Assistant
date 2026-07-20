@@ -240,7 +240,7 @@ export interface DashboardSnapshot {
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
-async function authHeaders() {
+export async function authHeaders() {
   const supabase = createSupabaseBrowserClient();
   const { data } = await supabase.auth.getSession();
   return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {};
