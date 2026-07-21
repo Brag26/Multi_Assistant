@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from sqlalchemy import (
     Boolean, DateTime, Enum, ForeignKey, Index, Integer,
-    String, Text, UniqueConstraint, func,
+    Numeric, String, Text, UniqueConstraint, func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -145,6 +145,38 @@ class IntegrationAssetModel(Base):
     payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     __table_args__ = (UniqueConstraint("tenant_id", "provider", "external_id", name="uq_integration_assets_external"),)
+
+
+class LeadgenRunModel(Base):
+    """One Apify actor run triggered from the Lead Generation page."""
+    __tablename__ = "leadgen_runs"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    triggered_by_user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    apify_run_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    dataset_id: Mapped[str | None] = mapped_column(String(120))
+    status: Mapped[str] = mapped_column(String(30), default="running")
+    item_count: Mapped[int] = mapped_column(Integer, default=0)
+    compute_units: Mapped[float] = mapped_column(Numeric(10, 4), default=0)
+    imported_contact_count: Mapped[int] = mapped_column(Integer, default=0)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FeatureAccessModel(Base):
+    """Superadmin-controlled feature visibility. A row here grants (or
+    explicitly revokes) one nav feature for one user. Absence of a row means
+    'not granted' for resellers/clients — the default is hidden, opt-in."""
+    __tablename__ = "feature_access"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    feature_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    allowed: Mapped[bool] = mapped_column(default=True)
+    granted_by_user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (UniqueConstraint("tenant_id", "user_id", "feature_key", name="uq_feature_access"),)
 
 
 class AssistantAssignmentModel(Base):

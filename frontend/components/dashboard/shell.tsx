@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { useSessionStore } from "@/store/session";
+import { getMyFeatures } from "@/lib/api";
 
 interface NavItem { href: Route; label: string; icon: LucideIcon; }
 interface NavGroup { label: string; items: NavItem[]; }
@@ -46,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/lead-scoring", label: "Lead Scoring", icon: TrendingUp },
       { href: "/appointments", label: "Appointments", icon: CalendarCheck },
       { href: "/dnc",          label: "DNC List",     icon: ShieldOff },
+      { href: "/leadgen",      label: "Lead Generation", icon: Target },
     ],
   },
   {
@@ -75,8 +78,17 @@ export function DashboardShell({ children }: Props) {
   const { theme, toggleTheme } = useTheme();
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [allowedFeatures, setAllowedFeatures] = useState<string[] | null>(null); // null = not loaded yet (show all while loading)
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const tenantId = useSessionStore((s) => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
+
+  useEffect(() => {
+    if (!tenantId) return;
+    getMyFeatures(tenantId)
+      .then((res) => setAllowedFeatures(res.unrestricted ? null : res.features))
+      .catch(() => setAllowedFeatures(null)); // fail open rather than locking someone out on a network blip
+  }, [tenantId, userRole]);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -147,7 +159,15 @@ export function DashboardShell({ children }: Props) {
 
         {/* Scrollable Nav */}
         <nav className="flex-1 px-2 py-2 overflow-y-auto min-h-0">
-          {NAV_GROUPS.map(group => (
+          {NAV_GROUPS
+            .map(group => ({
+              ...group,
+              items: allowedFeatures === null
+                ? group.items
+                : group.items.filter(item => allowedFeatures.includes(item.href.replace(/^\//, ""))),
+            }))
+            .filter(group => group.items.length > 0)
+            .map(group => (
             <div key={group.label} className="mb-3">
               <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 {group.label}
@@ -225,6 +245,12 @@ export function DashboardShell({ children }: Props) {
                     <Link href="/superadmin/assistants" onClick={() => setMenuOpen(false)}
                       className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
                       <Mic className="w-4 h-4" /> Manage Assistants
+                    </Link>
+                  )}
+                  {isSuperAdmin && (
+                    <Link href="/superadmin/features" onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <ShieldCheck className="w-4 h-4" /> Feature Access
                     </Link>
                   )}
                 </>

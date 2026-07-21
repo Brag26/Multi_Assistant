@@ -340,6 +340,30 @@ export const listMyAssistants = (tid: string) => apiFetch<{ external_id: string;
 export const getMySettings = (tid: string) => apiFetch<{ timezone: string | null }>(`/tenants/${tid}/settings/me`);
 export const updateMySettings = (tid: string, timezone: string) =>
   apiFetch<{ ok: boolean; timezone: string }>(`/tenants/${tid}/settings/me`, { method: "PATCH", body: JSON.stringify({ timezone }) });
+
+// ── Feature access (superadmin controls what resellers/clients can see) ─────
+
+export interface FeatureCatalogItem { key: string; label: string; group: string; }
+export const getFeatureCatalog = (tid: string) => apiFetch<{ features: FeatureCatalogItem[]; always_visible: string[] }>(`/tenants/${tid}/features/catalog`);
+export const getMyFeatures = (tid: string) => apiFetch<{ features: string[]; unrestricted: boolean }>(`/tenants/${tid}/features/me`);
+export const listAccountsWithFeatures = (tid: string) =>
+  apiFetch<{ user_id: string; email: string; display_name: string | null; role: string; granted_features: string[] }[]>(`/tenants/${tid}/features/accounts`);
+export const setFeaturesBulk = (tid: string, user_id: string, feature_keys: string[]) =>
+  apiFetch<{ ok: boolean }>(`/tenants/${tid}/features/set-bulk`, { method: "POST", body: JSON.stringify({ user_id, feature_keys }) });
+
+// ── Lead Generation (Apify) ──────────────────────────────────────────────────
+
+export interface LeadgenRun {
+  id: string; actor_id: string; status: string; item_count: number;
+  compute_units: number; imported_contact_count: number; started_at: string; finished_at: string | null;
+}
+export const listApifyActors = (tid: string) => apiFetch<{ id: string; name: string; title: string }[]>(`/tenants/${tid}/leadgen/actors`);
+export const runApifyActor = (tid: string, actor_id: string, run_input: Record<string, unknown> = {}) =>
+  apiFetch<{ run_id: string; apify_run_id: string; status: string }>(`/tenants/${tid}/leadgen/run`, { method: "POST", body: JSON.stringify({ actor_id, run_input }) });
+export const listLeadgenRuns = (tid: string) => apiFetch<LeadgenRun[]>(`/tenants/${tid}/leadgen/runs`);
+export const refreshLeadgenRun = (tid: string, runId: string) => apiFetch<{ id: string; status: string; item_count: number; compute_units: number }>(`/tenants/${tid}/leadgen/runs/${runId}/refresh`, { method: "POST" });
+export const importLeadgenRun = (tid: string, runId: string) => apiFetch<{ imported: number }>(`/tenants/${tid}/leadgen/runs/${runId}/import`, { method: "POST" });
+export const getLeadgenUsage = (tid: string) => apiFetch<any>(`/tenants/${tid}/leadgen/usage`);
 export const connectIntegration  = (tid: string, provider: string, p: Record<string, unknown>) => apiFetch<Integration>(`/tenants/${tid}/integrations/${provider}/connect`, { method: "POST", body: JSON.stringify(p) });
 export const disconnectIntegration = (tid: string, provider: string) => apiFetch<Integration | null>(`/tenants/${tid}/integrations/${provider}/disconnect`, { method: "POST" });
 export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make") => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets`);

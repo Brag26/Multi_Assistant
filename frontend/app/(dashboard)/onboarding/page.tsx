@@ -62,6 +62,7 @@ const INTEGRATIONS: Record<string, Category> = {
     providers: [
       { id: "hubspot", name: "HubSpot", tag: "Most Popular", desc: "World's #1 CRM. Sync contacts, deals, and call outcomes automatically.", docsUrl: "https://app.hubspot.com", fields: [{ key: "api_key", label: "Private App Token", placeholder: "pat-na1-...", type: "password", hint: "HubSpot → Settings → Integrations → Private Apps" }] },
       { id: "zoho", name: "Zoho CRM", tag: "Popular in India 🇮🇳", desc: "India's favourite CRM. Great pricing, deep customization, strong India support.", docsUrl: "https://crm.zoho.in", fields: [{ key: "client_id", label: "Client ID", placeholder: "1000.XXXXX", type: "text", hint: "Zoho API Console → Client ID" }, { key: "client_secret", label: "Client Secret", placeholder: "••••••••", type: "password", hint: "Zoho API Console → Client Secret" }, { key: "refresh_token", label: "Refresh Token", placeholder: "1000.XXXXX", type: "password", hint: "OAuth → Refresh Token" }] },
+      { id: "apify", name: "Apify", tag: "Lead Generation", recommended: true, desc: "Run web-scraping actors to pull fresh leads straight into Contacts. Track usage per account.", docsUrl: "https://console.apify.com", fields: [{ key: "api_key", label: "API Token", placeholder: "apify_api_...", type: "password", hint: "console.apify.com → Settings → Integrations → Personal API tokens" }] },
     ],
   },
   notifications: {

@@ -38,6 +38,7 @@ class IntegrationProvider(StrEnum):
     VAPI   = "vapi"
     TWILIO = "twilio"
     MAKE   = "make"
+    APIFY  = "apify"
 
 
 class LeadStatus(StrEnum):
