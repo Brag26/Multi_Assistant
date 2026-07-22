@@ -45,7 +45,11 @@ class VapiClient:
             payload["previousChatId"] = previous_chat_id
         async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=30) as client:
             response = await client.post("/chat", json=payload, headers=self._headers())
-            response.raise_for_status()
+            if response.status_code >= 400:
+                # Surface Vapi's actual error body instead of a generic
+                # "didn't respond" message — this is what tells us whether
+                # it's a bad assistant ID, an auth problem, or something else.
+                raise RuntimeError(f"Vapi chat API returned {response.status_code}: {response.text}")
             return response.json()
 
     def _headers(self) -> dict[str, str]:

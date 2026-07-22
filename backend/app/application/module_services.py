@@ -137,10 +137,10 @@ class CampaignService:
         self._can_manage(user, tenant_id)
         campaign = await self.campaigns.set_status(tenant_id, campaign_id, CampaignStatus.RUNNING)
         if background_tasks is not None:
-            background_tasks.add_task(_dial_campaign_now, str(campaign_id), tenant_id)
+            background_tasks.add_task(_dial_campaign_now, str(campaign_id), tenant_id, user.user_id)
         else:
             import asyncio
-            asyncio.create_task(_dial_campaign_now(str(campaign_id), tenant_id))
+            asyncio.create_task(_dial_campaign_now(str(campaign_id), tenant_id, user.user_id))
         return campaign
 
     def _can_manage(self, user: Principal, tenant_id: str) -> None:
@@ -210,7 +210,7 @@ class IntegrationService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot manage integrations")
 
 
-async def _dial_campaign_now(campaign_id: str, tenant_id: str) -> None:
+async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user_id: str) -> None:
     """Runs in the background after 'Start Now' — dials every contact
     attached to the campaign via Vapi directly (no Celery dependency)."""
     import structlog
@@ -266,6 +266,7 @@ async def _dial_campaign_now(campaign_id: str, tenant_id: str) -> None:
                 customer_phone=contact.phone,
                 assistant_id=campaign.vapi_assistant_id,
                 from_phone_number=from_number,
+                initiated_by_user_id=triggered_by_user_id,
                 status=CallStatus.QUEUED,
             )
             session.add(call)

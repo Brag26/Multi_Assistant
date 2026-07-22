@@ -73,13 +73,42 @@ async def send_chat_message(
         chat = await VapiClient().send_chat(config.support_assistant_id, body.message, body.previous_chat_id)
     except Exception as exc:
         log.warning("support.chat.failed", error=str(exc))
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "The support bot didn't respond — please try again")
+        # Surface the real upstream error instead of a generic message — this
+        # is what actually lets us diagnose a bad assistant ID, wrong API key,
+        # or a Vapi-side schema change, instead of guessing blind.
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Vapi chat error: {exc}")
 
-    reply_text = ""
-    for block in chat.get("output", []):
-        if block.get("role") == "assistant" and block.get("message"):
-            reply_text = block["message"]
+    reply_text = _extract_chat_reply(chat)
+    if not reply_text:
+        log.warning("support.chat.unparseable_response", raw=chat)
     return {"chat_id": chat.get("id"), "reply": reply_text or "Sorry, I didn't catch that — could you rephrase?"}
+
+
+def _extract_chat_reply(chat: dict) -> str:
+    """Vapi's chat response shape isn't fully pinned down here without a live
+    account to test against, so this tries several plausible layouts rather
+    than assuming one. Checked in order of likelihood."""
+    # Shape A: {"output": [{"role": "assistant", "message": "..."}]}
+    for block in chat.get("output", []) or []:
+        if isinstance(block, dict) and block.get("role") in ("assistant", "bot"):
+            for key in ("message", "content", "text"):
+                if block.get(key):
+                    return block[key]
+
+    # Shape B: {"messages": [{"role": "assistant", "content": "..."}]}
+    for block in chat.get("messages", []) or []:
+        if isinstance(block, dict) and block.get("role") == "assistant":
+            for key in ("content", "message", "text"):
+                if block.get(key):
+                    return block[key]
+
+    # Shape C: a flat top-level reply field
+    for key in ("output", "response", "message", "text", "reply"):
+        val = chat.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+
+    return ""
 
 
 class EscalateRequest(BaseModel):

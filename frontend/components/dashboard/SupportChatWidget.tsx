@@ -41,8 +41,9 @@ export function SupportChatWidget() {
       const res = await sendSupportChat(tenantId, text, chatId);
       setChatId(res.chat_id);
       setMessages((prev) => [...prev, { role: "assistant", text: res.reply }]);
-    } catch {
-      setMessages((prev) => [...prev, { role: "assistant", text: "Sorry, I'm having trouble responding right now. You can escalate to a human below." }]);
+    } catch (err: any) {
+      const detail = err?.message ? String(err.message).slice(0, 300) : "Unknown error";
+      setMessages((prev) => [...prev, { role: "assistant", text: `⚠️ ${detail}\n\nYou can escalate to a human below.` }]);
     } finally {
       setSending(false);
     }
