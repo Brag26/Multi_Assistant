@@ -78,32 +78,52 @@ async def send_chat_message(
         # or a Vapi-side schema change, instead of guessing blind.
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Vapi chat error: {exc}")
 
-    reply_text = _extract_chat_reply(chat)
+    try:
+        reply_text = _extract_chat_reply(chat)
+    except Exception as exc:
+        # Parsing must never crash the request even if Vapi's response shape
+        # doesn't match any of our guesses — log the raw payload so the real
+        # shape can be inspected, and degrade gracefully instead of 500ing.
+        log.warning("support.chat.parse_failed", error=str(exc), raw=chat)
+        reply_text = ""
+
     if not reply_text:
         log.warning("support.chat.unparseable_response", raw=chat)
-    return {"chat_id": chat.get("id"), "reply": reply_text or "Sorry, I didn't catch that — could you rephrase?"}
+    return {"chat_id": chat.get("id") if isinstance(chat, dict) else None, "reply": reply_text or "Sorry, I didn't catch that — could you rephrase?"}
 
 
 def _extract_chat_reply(chat: dict) -> str:
     """Vapi's chat response shape isn't fully pinned down here without a live
     account to test against, so this tries several plausible layouts rather
-    than assuming one. Checked in order of likelihood."""
+    than assuming one, and never assumes a field is the type we expect."""
+    if not isinstance(chat, dict):
+        return ""
+
     # Shape A: {"output": [{"role": "assistant", "message": "..."}]}
-    for block in chat.get("output", []) or []:
-        if isinstance(block, dict) and block.get("role") in ("assistant", "bot"):
-            for key in ("message", "content", "text"):
-                if block.get(key):
-                    return block[key]
+    output = chat.get("output")
+    if isinstance(output, list):
+        for block in output:
+            if isinstance(block, dict) and block.get("role") in ("assistant", "bot"):
+                for key in ("message", "content", "text"):
+                    val = block.get(key)
+                    if isinstance(val, str) and val.strip():
+                        return val
+    elif isinstance(output, str) and output.strip():
+        # Some Vapi responses may return the final reply as a flat string.
+        return output
 
     # Shape B: {"messages": [{"role": "assistant", "content": "..."}]}
-    for block in chat.get("messages", []) or []:
-        if isinstance(block, dict) and block.get("role") == "assistant":
-            for key in ("content", "message", "text"):
-                if block.get(key):
-                    return block[key]
+    messages = chat.get("messages")
+    if isinstance(messages, list):
+        for block in messages:
+            if isinstance(block, dict) and block.get("role") == "assistant":
+                for key in ("content", "message", "text"):
+                    val = block.get(key)
+                    if isinstance(val, str) and val.strip():
+                        return val
 
     # Shape C: a flat top-level reply field
-    for key in ("output", "response", "message", "text", "reply"):
+    for key in ("response", "message", "text", "reply"):
         val = chat.get(key)
         if isinstance(val, str) and val.strip():
             return val
