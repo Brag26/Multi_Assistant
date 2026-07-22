@@ -364,6 +364,21 @@ export const listLeadgenRuns = (tid: string) => apiFetch<LeadgenRun[]>(`/tenants
 export const refreshLeadgenRun = (tid: string, runId: string) => apiFetch<{ id: string; status: string; item_count: number; compute_units: number }>(`/tenants/${tid}/leadgen/runs/${runId}/refresh`, { method: "POST" });
 export const importLeadgenRun = (tid: string, runId: string) => apiFetch<{ imported: number }>(`/tenants/${tid}/leadgen/runs/${runId}/import`, { method: "POST" });
 export const getLeadgenUsage = (tid: string) => apiFetch<any>(`/tenants/${tid}/leadgen/usage`);
+
+// ── Support chatbot ──────────────────────────────────────────────────────────
+
+export const getSupportConfig = (tid: string) => apiFetch<{ configured: boolean; support_assistant_id: string | null }>(`/tenants/${tid}/support/config`);
+export const setSupportConfig = (tid: string, support_assistant_id: string | null) =>
+  apiFetch<{ ok: boolean }>(`/tenants/${tid}/support/config`, { method: "PUT", body: JSON.stringify({ support_assistant_id }) });
+export const sendSupportChat = (tid: string, message: string, previous_chat_id?: string | null) =>
+  apiFetch<{ chat_id: string; reply: string }>(`/tenants/${tid}/support/chat`, { method: "POST", body: JSON.stringify({ message, previous_chat_id }) });
+export const escalateSupportChat = (tid: string, message: string, conversation: { role: string; text: string }[]) =>
+  apiFetch<{ ok: boolean; escalation_id: string }>(`/tenants/${tid}/support/escalate`, { method: "POST", body: JSON.stringify({ message, conversation }) });
+export interface SupportEscalation {
+  id: string; user_email: string | null; message: string; status: string; created_at: string; resolved_at: string | null;
+}
+export const listSupportEscalations = (tid: string) => apiFetch<SupportEscalation[]>(`/tenants/${tid}/support/escalations`);
+export const resolveSupportEscalation = (tid: string, id: string) => apiFetch<{ ok: boolean }>(`/tenants/${tid}/support/escalations/${id}/resolve`, { method: "POST" });
 export const connectIntegration  = (tid: string, provider: string, p: Record<string, unknown>) => apiFetch<Integration>(`/tenants/${tid}/integrations/${provider}/connect`, { method: "POST", body: JSON.stringify(p) });
 export const disconnectIntegration = (tid: string, provider: string) => apiFetch<Integration | null>(`/tenants/${tid}/integrations/${provider}/disconnect`, { method: "POST" });
 export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make") => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets`);

@@ -40,6 +40,7 @@ from app.api.v1.assistant_assignments import router as assistant_assignments_rou
 from app.api.v1.settings import router as settings_router
 from app.api.v1.feature_access import router as feature_access_router
 from app.api.v1.leadgen import router as leadgen_router
+from app.api.v1.support import router as support_router
 
 api_router = APIRouter()
 
@@ -91,3 +92,4 @@ api_router.include_router(assistant_assignments_router)
 api_router.include_router(settings_router)
 api_router.include_router(feature_access_router)
 api_router.include_router(leadgen_router)
+api_router.include_router(support_router)

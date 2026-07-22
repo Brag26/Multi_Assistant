@@ -147,6 +147,31 @@ class IntegrationAssetModel(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "provider", "external_id", name="uq_integration_assets_external"),)
 
 
+class SupportConfigModel(Base):
+    """Which Vapi assistant powers the support chat widget — one row per
+    tenant, set by superadmin."""
+    __tablename__ = "support_config"
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    support_assistant_id: Mapped[str | None] = mapped_column(String(180))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class SupportEscalationModel(Base):
+    """A chat that the user asked to hand off to a human. Emailed to
+    superadmin (if a Make.com webhook is configured) and always logged here
+    so it's visible in-app even without email set up."""
+    __tablename__ = "support_escalations"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(UUID(as_uuid=False), index=True)
+    user_email: Mapped[str | None] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    conversation: Mapped[list] = mapped_column(JSONB, default=list)
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class LeadgenRunModel(Base):
     """One Apify actor run triggered from the Lead Generation page."""
     __tablename__ = "leadgen_runs"

@@ -36,5 +36,17 @@ class VapiClient:
             response.raise_for_status()
             return None
 
+    async def send_chat(self, assistant_id: str, message: str, previous_chat_id: str | None = None) -> dict:
+        """Vapi's text Chat API — same assistant config as voice calls, but a
+        plain text back-and-forth instead of a phone call. Pass the previous
+        response's `id` as previous_chat_id to keep conversation context."""
+        payload: dict = {"assistantId": assistant_id, "input": message}
+        if previous_chat_id:
+            payload["previousChatId"] = previous_chat_id
+        async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=30) as client:
+            response = await client.post("/chat", json=payload, headers=self._headers())
+            response.raise_for_status()
+            return response.json()
+
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"}

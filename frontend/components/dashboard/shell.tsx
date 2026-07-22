@@ -10,12 +10,13 @@ import {
   Plug, CalendarCheck, Bell, BarChart2, Shield, Activity,
   TrendingUp, ShieldOff, Webhook, Trophy, FileBarChart,
   Sun, Moon, Sparkles, LogOut, Settings, User, ChevronUp,
-  ShieldCheck, Zap, Mic, Target, CreditCard,
+  ShieldCheck, Zap, Mic, Target, CreditCard, LifeBuoy,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 import { getMyFeatures } from "@/lib/api";
+import { SupportChatWidget } from "@/components/dashboard/SupportChatWidget";
 
 interface NavItem { href: Route; label: string; icon: LucideIcon; }
 interface NavGroup { label: string; items: NavItem[]; }
@@ -253,6 +254,12 @@ export function DashboardShell({ children }: Props) {
                       <ShieldCheck className="w-4 h-4" /> Feature Access
                     </Link>
                   )}
+                  {isSuperAdmin && (
+                    <Link href="/superadmin/support" onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <LifeBuoy className="w-4 h-4" /> Support Chatbot
+                    </Link>
+                  )}
                 </>
               )}
               <div className="border-t border-slate-100 dark:border-slate-800" />
@@ -270,6 +277,8 @@ export function DashboardShell({ children }: Props) {
           {children}
         </div>
       </main>
+
+      <SupportChatWidget />
     </div>
   );
 }

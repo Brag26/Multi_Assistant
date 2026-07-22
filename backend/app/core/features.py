@@ -5,7 +5,7 @@ sidebar can filter directly against them. ALWAYS_VISIBLE features never need
 an explicit grant — every role sees them regardless of feature_access rows.
 """
 
-ALWAYS_VISIBLE = {"dashboard", "calls", "campaigns", "contacts", "billing", "settings", "integrations"}
+ALWAYS_VISIBLE = {"dashboard", "calls", "campaigns", "contacts", "billing", "settings", "integrations", "support"}
 
 FEATURE_CATALOG: list[dict] = [
     {"key": "dashboard", "label": "Dashboard", "group": "Overview"},
