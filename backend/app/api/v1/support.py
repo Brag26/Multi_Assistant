@@ -14,6 +14,8 @@ from app.core.security import CurrentUser, Role, require_role, require_tenant_ac
 from app.infrastructure.db.models import SupportConfigModel, SupportEscalationModel
 from app.infrastructure.integrations.make import MakeClient
 from app.infrastructure.integrations.vapi import VapiClient
+from app.application.schemas import NotificationCreate
+from app.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
 
 log = structlog.get_logger()
 router = APIRouter(prefix="/tenants/{tenant_id}/support", tags=["support"])
@@ -189,8 +191,9 @@ async def list_escalations(tenant_id: str, user=Depends(SuperAdmin), session: As
     )
     return [
         {
-            "id": e.id, "user_email": e.user_email, "message": e.message,
-            "status": e.status, "created_at": e.created_at, "resolved_at": e.resolved_at,
+            "id": e.id, "user_id": e.user_id, "user_email": e.user_email, "message": e.message,
+            "status": e.status, "reply": e.reply, "replied_at": e.replied_at,
+            "created_at": e.created_at, "resolved_at": e.resolved_at,
         }
         for e in result.scalars().all()
     ]
@@ -206,4 +209,55 @@ async def resolve_escalation(tenant_id: str, escalation_id: str, user=Depends(Su
     row.status = "resolved"
     row.resolved_at = datetime.now(UTC)
     await session.commit()
+    return {"ok": True}
+
+
+@router.delete("/escalations/{escalation_id}")
+async def delete_escalation(tenant_id: str, escalation_id: str, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
+    result = await session.execute(select(SupportEscalationModel).where(SupportEscalationModel.id == escalation_id, SupportEscalationModel.tenant_id == tenant_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    await session.delete(row)
+    await session.commit()
+    return {"ok": True}
+
+
+class ReplyEscalationRequest(BaseModel):
+    message: str
+
+
+@router.post("/escalations/{escalation_id}/reply")
+async def reply_to_escalation(
+    tenant_id: str,
+    escalation_id: str,
+    body: ReplyEscalationRequest,
+    user=Depends(SuperAdmin),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Superadmin replies to an escalation. The reply is saved on the
+    escalation itself and also delivered as a notification targeted at the
+    person who raised it — that's what makes it show up in their bell."""
+    from datetime import UTC, datetime
+
+    result = await session.execute(select(SupportEscalationModel).where(SupportEscalationModel.id == escalation_id, SupportEscalationModel.tenant_id == tenant_id))
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+
+    row.reply = body.message
+    row.replied_at = datetime.now(UTC)
+    if row.status == "open":
+        row.status = "resolved"
+        row.resolved_at = row.replied_at
+    await session.commit()
+
+    notif_repo = SqlAlchemyNotificationRepository(session)
+    await notif_repo.create(tenant_id, NotificationCreate(
+        title="Reply from Support",
+        message=body.message,
+        type="info",
+        user_id=row.user_id,
+    ))
+
     return {"ok": True}

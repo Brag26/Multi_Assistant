@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, LifeBuoy, Check, Mail } from "lucide-react";
+import { ArrowLeft, LifeBuoy, Check, Mail, Trash2, Reply } from "lucide-react";
 import { useSessionStore } from "@/store/session";
 import {
   getSupportConfig, setSupportConfig, listSupportEscalations, resolveSupportEscalation,
-  listMyAssistants, type SupportEscalation,
+  deleteSupportEscalation, replyToSupportEscalation, listMyAssistants, type SupportEscalation,
 } from "@/lib/api";
 
 export default function SupportAdminPage() {
@@ -55,6 +55,40 @@ export default function SupportAdminPage() {
   async function resolve(id: string) {
     await resolveSupportEscalation(tenantId, id);
     await refresh();
+  }
+
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replySaving, setReplySaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  function startReply(id: string) {
+    setReplyingId(id);
+    setReplyText("");
+  }
+
+  async function submitReply(id: string) {
+    if (!replyText.trim()) return;
+    setReplySaving(true);
+    try {
+      await replyToSupportEscalation(tenantId, id, replyText.trim());
+      setReplyingId(null);
+      setReplyText("");
+      await refresh();
+    } finally {
+      setReplySaving(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm("Delete this escalation? This can't be undone.")) return;
+    setDeletingId(id);
+    try {
+      await deleteSupportEscalation(tenantId, id);
+      await refresh();
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   const openEscalations = escalations.filter((e) => e.status === "open");
@@ -119,15 +153,55 @@ export default function SupportAdminPage() {
             ) : (
               <div className="space-y-2">
                 {openEscalations.map((e) => (
-                  <div key={e.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-slate-800">{e.message}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{e.user_email || "Unknown user"} · {new Date(e.created_at).toLocaleString()}</p>
+                  <div key={e.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm text-slate-800">{e.message}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{e.user_email || "Unknown user"} · {new Date(e.created_at).toLocaleString()}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => startReply(e.id)}
+                          className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-50">
+                          <Reply className="w-3 h-3" /> Reply
+                        </button>
+                        <button onClick={() => resolve(e.id)}
+                          className="text-xs font-medium px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-50">
+                          Mark Resolved
+                        </button>
+                        <button onClick={() => handleDelete(e.id)} disabled={deletingId === e.id}
+                          className="p-1.5 rounded bg-white border border-slate-200 hover:bg-red-50 text-red-500 disabled:opacity-50">
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
-                    <button onClick={() => resolve(e.id)}
-                      className="text-xs font-medium px-2.5 py-1 rounded bg-white border border-slate-200 hover:bg-slate-50 shrink-0">
-                      Mark Resolved
-                    </button>
+
+                    {e.reply && (
+                      <div className="mt-2 pl-3 border-l-2 border-indigo-200">
+                        <p className="text-xs text-slate-400">Your reply:</p>
+                        <p className="text-sm text-slate-700">{e.reply}</p>
+                      </div>
+                    )}
+
+                    {replyingId === e.id && (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          autoFocus
+                          value={replyText}
+                          onChange={(ev) => setReplyText(ev.target.value)}
+                          onKeyDown={(ev) => ev.key === "Enter" && submitReply(e.id)}
+                          placeholder="Type your reply — they'll see it in their notifications…"
+                          className="flex-1 text-sm px-3 py-1.5 rounded-md border border-slate-200"
+                        />
+                        <button onClick={() => submitReply(e.id)} disabled={replySaving || !replyText.trim()}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                          {replySaving ? "Sending…" : "Send"}
+                        </button>
+                        <button onClick={() => setReplyingId(null)}
+                          className="text-xs font-medium px-2.5 py-1.5 rounded-md text-slate-500 hover:bg-slate-100">
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -139,8 +213,15 @@ export default function SupportAdminPage() {
               <h2 className="font-semibold text-slate-500 mb-2 text-sm">Resolved</h2>
               <div className="space-y-1.5">
                 {resolvedEscalations.map((e) => (
-                  <div key={e.id} className="rounded-lg border border-slate-100 p-2.5 text-sm text-slate-400">
-                    {e.message} — {e.user_email || "Unknown"}
+                  <div key={e.id} className="rounded-lg border border-slate-100 p-2.5 text-sm text-slate-400 flex items-start justify-between gap-3">
+                    <div>
+                      <p>{e.message} — {e.user_email || "Unknown"}</p>
+                      {e.reply && <p className="text-xs text-slate-400 mt-1 pl-2 border-l-2 border-slate-200">Replied: {e.reply}</p>}
+                    </div>
+                    <button onClick={() => handleDelete(e.id)} disabled={deletingId === e.id}
+                      className="p-1.5 rounded hover:bg-red-50 text-red-400 disabled:opacity-50 shrink-0">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 ))}
               </div>

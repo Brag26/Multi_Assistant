@@ -66,7 +66,6 @@ api_router.include_router(audit_logs.router)
 api_router.include_router(monitoring_router)
 api_router.include_router(leads_router)
 api_router.include_router(appointments_router)
-api_router.include_router(notifications_router)
 api_router.include_router(analytics_router)
 api_router.include_router(audit_router)
 

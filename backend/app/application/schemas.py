@@ -473,6 +473,7 @@ class NotificationCreate(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     message: str
     type: NotificationType = NotificationType.INFO
+    user_id: str | None = None
 
 
 class NotificationRead(BaseModel):
@@ -482,6 +483,7 @@ class NotificationRead(BaseModel):
     title: str
     message: str
     type: NotificationType
+    user_id: UUID | None = None
     read: bool
     created_at: datetime
 

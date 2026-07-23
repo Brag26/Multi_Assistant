@@ -168,6 +168,8 @@ class SupportEscalationModel(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     conversation: Mapped[list] = mapped_column(JSONB, default=list)
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)
+    reply: Mapped[str | None] = mapped_column(Text)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -432,6 +434,7 @@ class NotificationModel(Base):
         default=NotificationType.INFO,
         nullable=False,
     )
+    user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), index=True)  # None = tenant-wide broadcast
     read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

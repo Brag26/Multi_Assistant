@@ -375,10 +375,14 @@ export const sendSupportChat = (tid: string, message: string, previous_chat_id?:
 export const escalateSupportChat = (tid: string, message: string, conversation: { role: string; text: string }[]) =>
   apiFetch<{ ok: boolean; escalation_id: string }>(`/tenants/${tid}/support/escalate`, { method: "POST", body: JSON.stringify({ message, conversation }) });
 export interface SupportEscalation {
-  id: string; user_email: string | null; message: string; status: string; created_at: string; resolved_at: string | null;
+  id: string; user_id?: string | null; user_email: string | null; message: string; status: string;
+  reply?: string | null; replied_at?: string | null; created_at: string; resolved_at: string | null;
 }
 export const listSupportEscalations = (tid: string) => apiFetch<SupportEscalation[]>(`/tenants/${tid}/support/escalations`);
 export const resolveSupportEscalation = (tid: string, id: string) => apiFetch<{ ok: boolean }>(`/tenants/${tid}/support/escalations/${id}/resolve`, { method: "POST" });
+export const deleteSupportEscalation = (tid: string, id: string) => apiFetch<{ ok: boolean }>(`/tenants/${tid}/support/escalations/${id}`, { method: "DELETE" });
+export const replyToSupportEscalation = (tid: string, id: string, message: string) =>
+  apiFetch<{ ok: boolean }>(`/tenants/${tid}/support/escalations/${id}/reply`, { method: "POST", body: JSON.stringify({ message }) });
 export const connectIntegration  = (tid: string, provider: string, p: Record<string, unknown>) => apiFetch<Integration>(`/tenants/${tid}/integrations/${provider}/connect`, { method: "POST", body: JSON.stringify(p) });
 export const disconnectIntegration = (tid: string, provider: string) => apiFetch<Integration | null>(`/tenants/${tid}/integrations/${provider}/disconnect`, { method: "POST" });
 export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make") => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets`);
