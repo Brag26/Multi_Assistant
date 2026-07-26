@@ -16,6 +16,7 @@ from app.core.plans import PLANS, USAGE_WARNING_THRESHOLD
 from app.core.security import CurrentUser, Role, require_role, require_tenant_access
 from app.domain.enums import BillingPlan, PaymentGateway, PaymentStatus, SubscriptionStatus
 from app.infrastructure.db.billing_models import AddonConfigModel, PaymentModel, PlanConfigModel, SubscriptionModel, UsageLogModel
+from app.infrastructure.db.models import PlatformCostConfigModel
 from app.infrastructure.integrations.make import MakeClient
 from app.infrastructure.integrations.razorpay import RazorpayClient
 from app.infrastructure.integrations.stripe import StripeClient
@@ -589,3 +590,83 @@ async def admin_update_addon(
     await session.commit()
     return {"key": row.key, "name": row.name, "price_inr": float(row.price_inr), "minutes": row.minutes, "description": row.description}
 
+
+# ── Margin calculator — real cost vs. price, per plan and per client ────────
+
+class CostConfigRequest(BaseModel):
+    cost_per_minute_inr: float
+
+
+@admin_router.get("/cost-config")
+async def get_cost_config(tenant_id: str, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
+    result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == tenant_id))
+    row = result.scalar_one_or_none()
+    return {"cost_per_minute_inr": float(row.cost_per_minute_inr) if row else 6.0}
+
+
+@admin_router.put("/cost-config")
+async def set_cost_config(tenant_id: str, body: CostConfigRequest, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
+    result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == tenant_id))
+    row = result.scalar_one_or_none()
+    if row:
+        row.cost_per_minute_inr = body.cost_per_minute_inr
+    else:
+        session.add(PlatformCostConfigModel(tenant_id=tenant_id, cost_per_minute_inr=body.cost_per_minute_inr))
+    await session.commit()
+    return {"ok": True, "cost_per_minute_inr": body.cost_per_minute_inr}
+
+
+@admin_router.get("/margins")
+async def get_margins(tenant_id: str, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
+    """Live margin per plan (list price) and per active subscriber (using
+    their actual minutes used), based on the superadmin's real ₹/min cost."""
+    cost_result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == tenant_id))
+    cost_row = cost_result.scalar_one_or_none()
+    cost_per_min = float(cost_row.cost_per_minute_inr) if cost_row else 6.0
+
+    configs = await get_plan_configs(session)
+    plan_margins = []
+    for plan, info in configs.items():
+        if not info["price_inr"] or not info["minutes_limit"]:
+            plan_margins.append({
+                "plan": plan.value, "name": info["name"], "price_inr": info["price_inr"],
+                "minutes_limit": info["minutes_limit"], "effective_rate_per_min": None,
+                "margin_per_min": None, "margin_pct": None,
+            })
+            continue
+        effective_rate = info["price_inr"] / info["minutes_limit"]
+        margin_per_min = effective_rate - cost_per_min
+        plan_margins.append({
+            "plan": plan.value, "name": info["name"], "price_inr": info["price_inr"],
+            "minutes_limit": info["minutes_limit"], "effective_rate_per_min": round(effective_rate, 2),
+            "margin_per_min": round(margin_per_min, 2),
+            "margin_pct": round((margin_per_min / effective_rate) * 100, 1) if effective_rate else None,
+        })
+
+    sub_result = await session.execute(select(SubscriptionModel).where(SubscriptionModel.status == SubscriptionStatus.ACTIVE))
+    subs = sub_result.scalars().all()
+    account_margins = []
+    for sub in subs:
+        plan_info = configs.get(sub.plan, {})
+        price = plan_info.get("price_inr")
+        info_result = await session.execute(text("SELECT email, display_name, role FROM memberships WHERE user_id = :uid LIMIT 1"), {"uid": sub.user_id})
+        info = info_result.mappings().first()
+        revenue = float(price) if price else None
+        cost = round(sub.minutes_used * cost_per_min, 2)
+        margin = round(revenue - cost, 2) if revenue is not None else None
+        account_margins.append({
+            "user_id": sub.user_id,
+            "email": info["email"] if info else None,
+            "display_name": info["display_name"] if info else None,
+            "role": info["role"] if info else None,
+            "plan": sub.plan.value,
+            "minutes_used": sub.minutes_used,
+            "minutes_limit": sub.minutes_limit,
+            "revenue_inr": revenue,
+            "cost_inr": cost,
+            "margin_inr": margin,
+            "margin_pct": round((margin / revenue) * 100, 1) if margin is not None and revenue else None,
+        })
+    account_margins.sort(key=lambda a: (a["margin_pct"] is None, a["margin_pct"]))
+
+    return {"cost_per_minute_inr": cost_per_min, "plans": plan_margins, "accounts": account_margins}

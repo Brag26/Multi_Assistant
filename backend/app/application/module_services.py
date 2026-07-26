@@ -14,7 +14,7 @@ from app.infrastructure.repositories.campaigns import SqlAlchemyCampaignReposito
 from app.infrastructure.repositories.contacts import SqlAlchemyContactRepository
 from app.infrastructure.repositories.integrations import SqlAlchemyIntegrationRepository
 
-WRITE_ROLES = {Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.MANAGER}
+WRITE_ROLES = {Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.MANAGER, Role.AGENT}
 CALL_ROLES = {Role.SUPER_ADMIN, Role.TENANT_ADMIN, Role.MANAGER, Role.AGENT}
 
 class ContactService:

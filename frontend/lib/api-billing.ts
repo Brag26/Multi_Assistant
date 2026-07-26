@@ -87,6 +87,22 @@ export const adminListPlans = () => apiFetch<PlanInfo[]>(`/admin/billing/plans`)
 export const adminUpdatePlan = (plan: BillingPlanId, patch: Partial<{ name: string; price_inr: number; minutes_limit: number; description: string }>) =>
   apiFetch<PlanInfo>(`/admin/billing/plans/${plan}`, { method: "PUT", body: JSON.stringify(patch) });
 
+// ── Margin calculator ────────────────────────────────────────────────────────
+
+export interface PlanMargin {
+  plan: string; name: string; price_inr: number | null; minutes_limit: number | null;
+  effective_rate_per_min: number | null; margin_per_min: number | null; margin_pct: number | null;
+}
+export interface AccountMargin {
+  user_id: string; email: string | null; display_name: string | null; role: string | null;
+  plan: string; minutes_used: number; minutes_limit: number;
+  revenue_inr: number | null; cost_inr: number; margin_inr: number | null; margin_pct: number | null;
+}
+export const getCostConfig = () => apiFetch<{ cost_per_minute_inr: number }>(`/admin/billing/cost-config`);
+export const setCostConfig = (cost_per_minute_inr: number) =>
+  apiFetch<{ ok: boolean; cost_per_minute_inr: number }>(`/admin/billing/cost-config`, { method: "PUT", body: JSON.stringify({ cost_per_minute_inr }) });
+export const getMargins = () => apiFetch<{ cost_per_minute_inr: number; plans: PlanMargin[]; accounts: AccountMargin[] }>(`/admin/billing/margins`);
+
 export const adminAssignPlan = (user_id: string, plan: BillingPlanId, minutes_limit?: number) =>
   apiFetch<{ ok: boolean }>(`/admin/billing/assign`, {
     method: "POST",

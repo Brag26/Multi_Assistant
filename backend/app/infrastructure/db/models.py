@@ -147,6 +147,15 @@ class IntegrationAssetModel(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "provider", "external_id", name="uq_integration_assets_external"),)
 
 
+class PlatformCostConfigModel(Base):
+    """Superadmin's real per-minute cost (Vapi + Twilio, etc.) — used to
+    compute live margin per plan and per client, rather than guessing."""
+    __tablename__ = "platform_cost_config"
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True)
+    cost_per_minute_inr: Mapped[float] = mapped_column(Numeric(10, 4), default=6.0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class SupportConfigModel(Base):
     """Which Vapi assistant powers the support chat widget — one row per
     tenant, set by superadmin."""

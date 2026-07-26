@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Script from "next/script";
-import { CreditCard, Smartphone, Zap, TrendingUp, Building2, Users, Pencil, Check, X, Plus } from "lucide-react";
+import { CreditCard, Smartphone, Zap, TrendingUp, Building2, Users, Pencil, Check, X, Plus, Calculator } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,9 @@ import {
   listPlans, getMySubscription, createCheckout, verifyRazorpayPayment,
   adminListAccounts, adminListPlans, adminUpdatePlan, adminAssignPlan,
   listAddons, adminListAddons, adminUpdateAddon, createAddonCheckout,
+  getCostConfig, setCostConfig, getMargins,
   type PlanInfo, type Subscription, type BillingPlanId, type AdminAccount, type AddonInfo,
+  type PlanMargin, type AccountMargin,
 } from "@/lib/api-billing";
 
 declare global {
@@ -290,6 +292,148 @@ function ClientBillingView() {
 
 // ── Superadmin view — edit plan pricing, assign plans to accounts free ──────
 
+// ── Margin calculator — real cost vs price, per plan and per active account ──
+
+function MarginCalculator() {
+  const [costPerMin, setCostPerMin] = useState("");
+  const [savedCost, setSavedCost] = useState<number | null>(null);
+  const [plans, setPlans] = useState<PlanMargin[]>([]);
+  const [accounts, setAccounts] = useState<AccountMargin[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getMargins();
+      setSavedCost(data.cost_per_minute_inr);
+      setCostPerMin(String(data.cost_per_minute_inr));
+      setPlans(data.plans);
+      setAccounts(data.accounts);
+    } catch (err: any) {
+      setError(err?.message || "Couldn't load margin data.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  async function saveCost() {
+    const val = Number(costPerMin);
+    if (!val || val <= 0) return;
+    setSaving(true);
+    try {
+      await setCostConfig(val);
+      await refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-semibold text-slate-800 flex items-center gap-1.5">
+          <Calculator className="w-4 h-4" /> Margin Calculator
+        </h2>
+        <button onClick={() => setExpanded((v) => !v)} className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
+          {expanded ? "Hide accounts" : "Show per-account breakdown"}
+        </button>
+      </div>
+
+      <Card>
+        <CardContent className="pt-5">
+          <div className="flex items-end gap-2 mb-5 max-w-sm">
+            <div className="flex-1">
+              <label className="block text-xs text-slate-500 mb-1">Your real cost (₹/min — Vapi + Twilio, etc.)</label>
+              <Input value={costPerMin} onChange={(e) => setCostPerMin(e.target.value)} placeholder="e.g. 6.00" />
+            </div>
+            <Button onClick={saveCost} disabled={saving} size="sm">{saving ? "Saving…" : "Save"}</Button>
+          </div>
+
+          {loading ? (
+            <p className="text-sm text-slate-500">Loading…</p>
+          ) : error ? (
+            <p className="text-sm text-amber-700">{error} <button onClick={refresh} className="underline">Retry</button></p>
+          ) : (
+            <>
+              <table className="w-full text-sm mb-2">
+                <thead>
+                  <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
+                    <th className="py-2 font-medium">Plan</th>
+                    <th className="py-2 font-medium">Price</th>
+                    <th className="py-2 font-medium">Effective ₹/min</th>
+                    <th className="py-2 font-medium">Margin/min</th>
+                    <th className="py-2 font-medium">Margin %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {plans.map((p) => (
+                    <tr key={p.plan} className="border-b border-slate-50 last:border-0">
+                      <td className="py-2 font-medium text-slate-800">{p.name}</td>
+                      <td className="py-2 text-slate-600">{p.price_inr ? `₹${p.price_inr}/${p.minutes_limit}min` : "Custom"}</td>
+                      <td className="py-2 text-slate-600">{p.effective_rate_per_min !== null ? `₹${p.effective_rate_per_min}` : "—"}</td>
+                      <td className={`py-2 font-medium ${p.margin_per_min !== null && p.margin_per_min < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        {p.margin_per_min !== null ? `₹${p.margin_per_min}` : "—"}
+                      </td>
+                      <td className={`py-2 font-medium ${p.margin_pct !== null && p.margin_pct < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        {p.margin_pct !== null ? `${p.margin_pct}%` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {plans.some((p) => p.margin_pct !== null && p.margin_pct < 0) && (
+                <p className="text-xs text-red-600 mb-2">⚠️ At least one plan is priced below your real cost — you lose money as usage grows on it.</p>
+              )}
+
+              {expanded && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Active Accounts (worst margin first)</p>
+                  {accounts.length === 0 ? (
+                    <p className="text-sm text-slate-400">No active subscriptions yet.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
+                          <th className="py-2 font-medium">Account</th>
+                          <th className="py-2 font-medium">Plan</th>
+                          <th className="py-2 font-medium">Minutes Used</th>
+                          <th className="py-2 font-medium">Revenue</th>
+                          <th className="py-2 font-medium">Cost</th>
+                          <th className="py-2 font-medium">Margin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {accounts.map((a) => (
+                          <tr key={a.user_id} className="border-b border-slate-50 last:border-0">
+                            <td className="py-2">{a.display_name || a.email}</td>
+                            <td className="py-2 capitalize text-slate-600">{a.plan}</td>
+                            <td className="py-2 text-slate-600">{a.minutes_used}/{a.minutes_limit}</td>
+                            <td className="py-2 text-slate-600">{a.revenue_inr !== null ? `₹${a.revenue_inr}` : "—"}</td>
+                            <td className="py-2 text-slate-600">₹{a.cost_inr}</td>
+                            <td className={`py-2 font-medium ${a.margin_pct !== null && a.margin_pct < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                              {a.margin_inr !== null ? `₹${a.margin_inr} (${a.margin_pct}%)` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 function AdminBillingView() {
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [addons, setAddons] = useState<AddonInfo[]>([]);
@@ -374,6 +518,8 @@ function AdminBillingView() {
 
   return (
     <div className="space-y-10">
+      <MarginCalculator />
+
       {/* Plan pricing editor */}
       <section>
         <h2 className="font-semibold text-slate-800 mb-3">Plan Pricing</h2>
