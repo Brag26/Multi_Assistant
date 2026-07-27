@@ -598,29 +598,29 @@ class CostConfigRequest(BaseModel):
 
 
 @admin_router.get("/cost-config")
-async def get_cost_config(tenant_id: str, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
-    result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == tenant_id))
+async def get_cost_config(user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
+    result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == user.tenant_id))
     row = result.scalar_one_or_none()
     return {"cost_per_minute_inr": float(row.cost_per_minute_inr) if row else 6.0}
 
 
 @admin_router.put("/cost-config")
-async def set_cost_config(tenant_id: str, body: CostConfigRequest, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
-    result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == tenant_id))
+async def set_cost_config(body: CostConfigRequest, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
+    result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == user.tenant_id))
     row = result.scalar_one_or_none()
     if row:
         row.cost_per_minute_inr = body.cost_per_minute_inr
     else:
-        session.add(PlatformCostConfigModel(tenant_id=tenant_id, cost_per_minute_inr=body.cost_per_minute_inr))
+        session.add(PlatformCostConfigModel(tenant_id=user.tenant_id, cost_per_minute_inr=body.cost_per_minute_inr))
     await session.commit()
     return {"ok": True, "cost_per_minute_inr": body.cost_per_minute_inr}
 
 
 @admin_router.get("/margins")
-async def get_margins(tenant_id: str, user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
+async def get_margins(user=Depends(SuperAdmin), session: AsyncSession = Depends(get_db_session)):
     """Live margin per plan (list price) and per active subscriber (using
     their actual minutes used), based on the superadmin's real ₹/min cost."""
-    cost_result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == tenant_id))
+    cost_result = await session.execute(select(PlatformCostConfigModel).where(PlatformCostConfigModel.tenant_id == user.tenant_id))
     cost_row = cost_result.scalar_one_or_none()
     cost_per_min = float(cost_row.cost_per_minute_inr) if cost_row else 6.0
 
