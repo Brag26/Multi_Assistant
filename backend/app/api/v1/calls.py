@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from app.api.deps import SessionDep, call_service
 from app.application.services import CallService
 from app.application.schemas import CallRead
+from app.application.call_routing import resolve_vapi_client
 from app.core.security import CurrentUser, require_tenant_access
-from app.infrastructure.integrations.vapi import VapiClient
 from app.infrastructure.repositories.calls import SqlAlchemyCallRepository
 from typing import Annotated
 from fastapi import Depends
@@ -57,7 +57,10 @@ async def get_call_recording_url(
     if not call.provider_call_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "This call has no Vapi recording")
 
-    signed_url = await VapiClient().get_recording_url(call.provider_call_id, kind=kind)
+    signed_url = None
+    if call.assistant_id:
+        client = await resolve_vapi_client(session, tenant_id, call.assistant_id)
+        signed_url = await client.get_recording_url(call.provider_call_id, kind=kind)
     if not signed_url:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No recording available for this call")
     return {"recording_url": signed_url}

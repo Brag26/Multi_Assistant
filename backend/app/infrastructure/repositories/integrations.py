@@ -87,7 +87,7 @@ class SqlAlchemyIntegrationRepository:
             await self.session.refresh(integration)
         return integration
 
-    async def upsert_assets(self, tenant_id: str, provider: IntegrationProvider, assets: List[dict]):
+    async def upsert_assets(self, tenant_id: str, provider: IntegrationProvider, assets: List[dict], owner_user_id: str | None = None):
         for asset in assets:
             stmt = insert(IntegrationAssetModel).values(
                 tenant_id=tenant_id,
@@ -95,10 +95,11 @@ class SqlAlchemyIntegrationRepository:
                 external_id=asset["external_id"],
                 label=asset["label"],
                 payload=asset.get("payload", {}),
+                owner_user_id=owner_user_id,
                 synced_at=datetime.now(UTC),
             ).on_conflict_do_update(
                 constraint="uq_integration_assets_external",
-                set_={"label": asset["label"], "payload": asset.get("payload", {}), "synced_at": datetime.now(UTC)},
+                set_={"label": asset["label"], "payload": asset.get("payload", {}), "owner_user_id": owner_user_id, "synced_at": datetime.now(UTC)},
             )
             await self.session.execute(stmt)
         await self.session.commit()

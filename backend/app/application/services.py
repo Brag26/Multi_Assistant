@@ -156,10 +156,15 @@ class CallService:
         wf = await self.workflows.get_for_tenant(tenant_id, workflow_id)
         if wf is None or wf.vapi_assistant_id is None:
             raise HTTPException(status_code=400, detail="Workflow is not launchable")
+
+        from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+        await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
+        vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, wf.vapi_assistant_id)
+
         call = await self.calls.create_queued(
             tenant_id, workflow_id, request, assistant_id=wf.vapi_assistant_id, initiated_by_user_id=user.user_id
         )
-        provider_call_id = await self.vapi.start_call(
+        provider_call_id = await vapi_client.start_call(
             request.customer_phone, wf.vapi_assistant_id,
             {"call_id": str(call.id), **request.metadata},
         )
@@ -191,12 +196,16 @@ class CallService:
         )
         from_number = assignment_result.scalar_one_or_none()
 
+        from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+        await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
+        vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, assistant_id)
+
         request = LaunchCallRequest(customer_phone=customer_phone)
         call = await self.calls.create_queued(
             tenant_id, None, request, assistant_id=assistant_id,
             initiated_by_user_id=user.user_id, from_phone_number=from_number,
         )
-        provider_call_id = await self.vapi.start_call(
+        provider_call_id = await vapi_client.start_call(
             customer_phone, assistant_id, {"call_id": str(call.id)},
         )
         await self.calls.mark_started(call.id, provider_call_id)

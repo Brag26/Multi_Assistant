@@ -175,9 +175,30 @@ class IntegrationService:
 
     async def refresh_vapi_assistants(self, user: Principal, tenant_id: str):
         self._can_manage(user, tenant_id)
-        assistants = await VapiClient().fetch_assistants()
-        assets = [{"external_id": item.get("id"), "label": item.get("name") or item.get("id"), "payload": item} for item in assistants if item.get("id")]
-        return await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets)
+        all_integrations = await self.integrations.list(tenant_id)
+        vapi_connections = [
+            i for i in all_integrations
+            if i.provider == IntegrationProvider.VAPI and i.disconnected_at is None and i.config.get("api_key")
+        ]
+
+        merged_assets = None
+        if vapi_connections:
+            # Sync every connected Vapi account — a reseller's own account's
+            # assistants get tagged with owner_user_id so calls placed with
+            # them later use that reseller's own key, not the shared one.
+            for conn in vapi_connections:
+                client = VapiClient(api_key=conn.config["api_key"])
+                assistants = await client.fetch_assistants()
+                assets = [{"external_id": item.get("id"), "label": item.get("name") or item.get("id"), "payload": item} for item in assistants if item.get("id")]
+                merged_assets = await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=conn.owner_user_id)
+        else:
+            # No Vapi account explicitly connected via the Setup Wizard yet —
+            # fall back to the platform's shared key, unowned (global) assets.
+            assistants = await VapiClient().fetch_assistants()
+            assets = [{"external_id": item.get("id"), "label": item.get("name") or item.get("id"), "payload": item} for item in assistants if item.get("id")]
+            merged_assets = await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=None)
+
+        return merged_assets
 
     async def refresh_twilio_numbers(self, user: Principal, tenant_id: str):
         self._can_manage(user, tenant_id)
@@ -218,10 +239,10 @@ async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user
     from app.domain.enums import CallStatus, CampaignStatus
     from app.infrastructure.db.models import CallModel, CampaignContactModel, CampaignModel, ContactModel, DncListModel
     from app.infrastructure.db.session import SessionLocal
-    from app.infrastructure.integrations.vapi import VapiClient
+    from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+    from fastapi import HTTPException
 
     log = structlog.get_logger()
-    vapi = VapiClient()
 
     async with SessionLocal() as session:
         campaign = await session.get(CampaignModel, campaign_id)
@@ -233,6 +254,8 @@ async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user
             campaign.status = CampaignStatus.COMPLETED
             await session.commit()
             return
+
+        vapi = await resolve_vapi_client(session, tenant_id, campaign.vapi_assistant_id)
 
         from app.infrastructure.db.models import AssistantAssignmentModel
         from_number = campaign.twilio_phone_number
@@ -256,9 +279,18 @@ async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user
         dnc_phones = {row[0] for row in dnc_result.all()}
 
         queued = 0
+        stopped_for_limit = False
         for contact in contacts:
             if contact.phone in dnc_phones:
                 continue
+
+            try:
+                await enforce_minute_limit(session, tenant_id, triggered_by_user_id)
+            except HTTPException:
+                log.warning("campaign.launch_now.minute_limit_hit", campaign_id=campaign_id, dialed_so_far=queued)
+                stopped_for_limit = True
+                break
+
             call = CallModel(
                 tenant_id=tenant_id,
                 campaign_id=campaign_id,
@@ -284,7 +316,10 @@ async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user
                 log.warning("campaign.launch_now.dial_failed", contact_id=str(contact.id), error=str(exc))
             await session.commit()
 
-        if queued == 0:
+        if stopped_for_limit:
+            campaign.status = CampaignStatus.PAUSED
+            await session.commit()
+        elif queued == 0:
             campaign.status = CampaignStatus.COMPLETED
             await session.commit()
-        log.info("campaign.launch_now.done", campaign_id=campaign_id, queued=queued)
+        log.info("campaign.launch_now.done", campaign_id=campaign_id, queued=queued, stopped_for_limit=stopped_for_limit)
