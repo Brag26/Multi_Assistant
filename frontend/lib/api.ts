@@ -259,6 +259,49 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
 }
 
+// ─── Call recordings ──────────────────────────────────────────────────────────
+// Matches every artifact type Vapi supports downloading as of their July 2026
+// update: mono, stereo, isolated customer/assistant tracks, video, and logs.
+
+export type RecordingKind =
+  | "mono-recording" | "stereo-recording" | "customer-recording"
+  | "assistant-recording" | "video-recording" | "call-logs";
+
+export const RECORDING_KIND_LABELS: Record<RecordingKind, string> = {
+  "mono-recording": "Recording (mono)",
+  "stereo-recording": "Recording (stereo)",
+  "customer-recording": "Customer only",
+  "assistant-recording": "Assistant only",
+  "video-recording": "Video",
+  "call-logs": "Call logs",
+};
+
+/** Fetches a fresh short-lived signed URL for playback (e.g. an <audio> tag). */
+export async function getRecordingUrl(tid: string, callId: string, kind: RecordingKind = "mono-recording") {
+  const res = await apiFetch<{ recording_url: string }>(`/tenants/${tid}/calls/${callId}/recording-url?kind=${kind}`);
+  return res.recording_url;
+}
+
+/** Actually saves the file (not just opens/streams it) — fetches the signed
+ * URL, pulls the bytes as a blob, and triggers a real browser "Save As"
+ * regardless of file type, since letting the browser navigate directly to a
+ * WAV/MP4 URL just plays it inline instead of downloading in most cases. */
+export async function downloadCallRecording(tid: string, callId: string, kind: RecordingKind, filenamePrefix: string) {
+  const url = await getRecordingUrl(tid, callId, kind);
+  const audioRes = await fetch(url);
+  if (!audioRes.ok) throw new Error("Couldn't fetch the recording file.");
+  const blob = await audioRes.blob();
+  const ext = kind === "video-recording" ? "mp4" : kind === "call-logs" ? "jsonl.gz" : "wav";
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = `${filenamePrefix}_${kind}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
+}
+
 // ─── Workflows ────────────────────────────────────────────────────────────────
 
 export const listWorkflows     = (tid: string) => apiFetch<Workflow[]>(`/tenants/${tid}/workflows`);

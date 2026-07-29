@@ -6,7 +6,8 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { DataTable } from "@/components/dashboard/data-table";
 import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/store/session";
-import { listCalls, apiFetch, type CallRecord } from "@/lib/api";
+import { listCalls, getRecordingUrl, type CallRecord } from "@/lib/api";
+import { RecordingDownloadMenu } from "@/components/dashboard/RecordingDownloadMenu";
 
 function downloadText(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -39,8 +40,8 @@ function downloadAllTranscripts(rows: CallRecord[]) {
 
 async function openRecording(tenantId: string, callId: string) {
   try {
-    const res = await apiFetch<{ recording_url: string }>(`/tenants/${tenantId}/calls/${callId}/recording-url`);
-    window.open(res.recording_url, "_blank");
+    const url = await getRecordingUrl(tenantId, callId);
+    window.open(url, "_blank");
   } catch {
     alert("Couldn't load this recording.");
   }
@@ -106,12 +107,19 @@ export default function CallsPage() {
               label: "Recording",
               render: (row) =>
                 row.recording_url ? (
-                  <button
-                    onClick={() => openRecording(tenantId, row.id)}
-                    className="text-indigo-600 hover:text-indigo-700 text-xs font-medium"
-                  >
-                    Open
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => openRecording(tenantId, row.id)}
+                      className="text-indigo-600 hover:text-indigo-700 text-xs font-medium"
+                    >
+                      Open
+                    </button>
+                    <RecordingDownloadMenu
+                      tenantId={tenantId}
+                      callId={row.id}
+                      filenamePrefix={row.customer_phone.replace(/[^0-9+]/g, "")}
+                    />
+                  </div>
                 ) : (
                   <span className="text-slate-400">—</span>
                 ),

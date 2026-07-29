@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSessionStore } from "@/store/session";
-import { listCalls, listCallEvents, apiFetch, type CallRecord, type CallMonitoringEvent } from "@/lib/api";
+import { listCalls, listCallEvents, getRecordingUrl, type CallRecord, type CallMonitoringEvent } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { LiveTranscriptPanel } from "@/components/dashboard/LiveTranscriptPanel";
 import { TestCallModal } from "@/components/dashboard/TestCallModal";
+import { RecordingDownloadMenu } from "@/components/dashboard/RecordingDownloadMenu";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PhoneCall, Activity, Clock, Mic } from "lucide-react";
@@ -49,8 +50,8 @@ export default function CallMonitoringPage() {
     setRecordingError(false);
     if (!selectedCall?.recording_url || !tenantId) return;
     setRecordingLoading(true);
-    apiFetch<{ recording_url: string }>(`/tenants/${tenantId}/calls/${selectedCall.id}/recording-url`)
-      .then((res) => setRecordingUrl(res.recording_url))
+    getRecordingUrl(tenantId, selectedCall.id)
+      .then((url) => setRecordingUrl(url))
       .catch(() => setRecordingError(true))
       .finally(() => setRecordingLoading(false));
   }, [selectedCall?.id, tenantId]);
@@ -161,7 +162,14 @@ export default function CallMonitoringPage() {
                       ) : recordingError ? (
                         <p className="text-xs text-amber-600">Couldn't load recording — it may have expired or Vapi's storage settings changed.</p>
                       ) : recordingUrl ? (
-                        <audio controls src={recordingUrl} className="w-full h-8" />
+                        <>
+                          <audio controls src={recordingUrl} className="w-full h-8 mb-1.5" />
+                          <RecordingDownloadMenu
+                            tenantId={tenantId}
+                            callId={selectedCall.id}
+                            filenamePrefix={selectedCall.customer_phone.replace(/[^0-9+]/g, "")}
+                          />
+                        </>
                       ) : null}
                     </div>
                   )}
