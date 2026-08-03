@@ -78,3 +78,77 @@ body {
 .dark .glass-card {
   background: linear-gradient(135deg, rgba(30,41,59,0.7), rgba(15,23,42,0.5));
 }
+
+/* ── Signature components, hand-built in the style of reactbits.dev / 21st.dev ── */
+
+/* Aurora background — slow-drifting mesh gradient blobs */
+@keyframes auroraDrift1 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); }
+  50% { transform: translate(15%, 10%) scale(1.15); }
+}
+@keyframes auroraDrift2 {
+  0%, 100% { transform: translate(0%, 0%) scale(1); }
+  50% { transform: translate(-12%, 8%) scale(1.1); }
+}
+.aurora-blob-1 { animation: auroraDrift1 14s ease-in-out infinite; }
+.aurora-blob-2 { animation: auroraDrift2 18s ease-in-out infinite; }
+
+/* Shiny animated gradient text */
+@keyframes shinyText {
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+.text-shiny-gradient {
+  background: linear-gradient(90deg, #6366f1 0%, #a855f7 25%, #ec4899 50%, #a855f7 75%, #6366f1 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shinyText 6s linear infinite;
+}
+
+/* Border beam — a light that travels around a card's edge */
+@keyframes borderBeamSpin {
+  100% { transform: rotate(360deg); }
+}
+.border-beam-wrap {
+  position: relative;
+  border-radius: 1rem;
+  padding: 1px;
+  overflow: hidden;
+}
+.border-beam-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  background: conic-gradient(from 0deg, transparent 0%, #818cf8 8%, transparent 16%);
+  animation: borderBeamSpin 4s linear infinite;
+}
+.border-beam-inner {
+  position: relative;
+  border-radius: calc(1rem - 1px);
+  background: white;
+  height: 100%;
+  width: 100%;
+}
+.dark .border-beam-inner {
+  background: #0f172a;
+}
+
+/* Spotlight hover card — radial highlight follows the cursor via CSS vars set from JS */
+.spotlight-card {
+  position: relative;
+  overflow: hidden;
+}
+.spotlight-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(400px circle at var(--spot-x, 50%) var(--spot-y, 50%), rgba(99,102,241,0.12), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.spotlight-card:hover::before {
+  opacity: 1;
+}
