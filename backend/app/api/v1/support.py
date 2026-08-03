@@ -261,3 +261,93 @@ async def reply_to_escalation(
     ))
 
     return {"ok": True}
+
+
+# ── Vapi function-calling webhook — gives the support bot real actions ──────
+# Configure these as "functions"/tools on the support assistant in Vapi's own
+# dashboard, each pointing its server URL at this endpoint. Vapi calls this
+# when the assistant decides to invoke a tool mid-conversation.
+
+from app.infrastructure.db.models import SupportToolCallModel
+from app.infrastructure.db.billing_models import SubscriptionModel
+from app.infrastructure.db.models import CampaignModel
+from sqlalchemy import select as _select
+
+
+async def _tool_check_account_status(session, tenant_id, user_id):
+    result = await session.execute(_select(SubscriptionModel).where(SubscriptionModel.tenant_id == tenant_id, SubscriptionModel.user_id == user_id))
+    sub = result.scalar_one_or_none()
+    if not sub:
+        return {"has_subscription": False}
+    return {
+        "has_subscription": True, "plan": sub.plan.value, "status": sub.status.value,
+        "minutes_used": sub.minutes_used, "minutes_limit": sub.minutes_limit,
+        "minutes_remaining": max(sub.minutes_limit - sub.minutes_used, 0),
+    }
+
+
+async def _tool_check_campaign_status(session, tenant_id, campaign_name):
+    result = await session.execute(_select(CampaignModel).where(CampaignModel.tenant_id == tenant_id, CampaignModel.name.ilike(f"%{campaign_name}%")))
+    campaign = result.scalars().first()
+    if not campaign:
+        return {"found": False}
+    calls_result = await session.execute(text("SELECT COUNT(*) FROM voice_calls WHERE campaign_id = :cid"), {"cid": campaign.id})
+    return {"found": True, "name": campaign.name, "status": campaign.status.value, "calls_dialed": calls_result.scalar() or 0}
+
+
+async def _tool_resume_campaign(session, tenant_id, campaign_name):
+    result = await session.execute(_select(CampaignModel).where(CampaignModel.tenant_id == tenant_id, CampaignModel.name.ilike(f"%{campaign_name}%")))
+    campaign = result.scalars().first()
+    if not campaign:
+        return {"success": False, "reason": "Campaign not found"}
+    if campaign.status != "paused":
+        return {"success": False, "reason": f"Campaign is '{campaign.status.value}', not paused"}
+    campaign.status = "running"
+    await session.commit()
+    return {"success": True}
+
+
+TOOL_HANDLERS = {
+    "check_account_status": _tool_check_account_status,
+    "check_campaign_status": _tool_check_campaign_status,
+    "resume_campaign": _tool_resume_campaign,
+}
+
+
+@router.post("/tool-webhook")
+async def support_tool_webhook(tenant_id: str, request: dict, session: AsyncSession = Depends(get_db_session)):
+    """Vapi's native function-call payload shape: {"message": {"toolCalls": [{"id", "function": {"name", "arguments"}}]}}.
+    Returns results in the shape Vapi expects back."""
+    tool_calls = (request.get("message") or {}).get("toolCalls") or request.get("toolCalls") or []
+    results = []
+    for call in tool_calls:
+        fn = call.get("function", {})
+        name = fn.get("name")
+        args = fn.get("arguments") or {}
+        if isinstance(args, str):
+            import json
+            try:
+                args = json.loads(args)
+            except Exception:
+                args = {}
+
+        handler = TOOL_HANDLERS.get(name)
+        if not handler:
+            output = {"error": f"Unknown tool: {name}"}
+        else:
+            try:
+                if name == "check_account_status":
+                    output = await handler(session, tenant_id, args.get("user_id", ""))
+                else:
+                    output = await handler(session, tenant_id, args.get("campaign_name", ""))
+            except Exception as exc:
+                output = {"error": str(exc)}
+
+        session.add(SupportToolCallModel(
+            tenant_id=tenant_id, user_id=args.get("user_id"), tool_name=name or "unknown",
+            arguments=args, result=output,
+        ))
+        results.append({"toolCallId": call.get("id"), "result": output})
+
+    await session.commit()
+    return {"results": results}

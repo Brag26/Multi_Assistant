@@ -431,3 +431,20 @@ export const disconnectIntegration = (tid: string, provider: string) => apiFetch
 export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make") => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets`);
 export const importContacts      = (tid: string, file: File) => { const form = new FormData(); form.append("file", file); return apiFetch(`/tenants/${tid}/contacts/import`, { method: "POST", body: form }); };
 export const createContact       = (tid: string, p: Partial<Contact>) => apiFetch<Contact>(`/tenants/${tid}/contacts`, { method: "POST", body: JSON.stringify(p) });
+
+// ─── Autopilot ──────────────────────────────────────────────────────────────
+
+export interface AutopilotAction {
+  id: string; check_name: string; action_type: string; title: string; detail: string;
+  target_type: string | null; target_id: string | null; requires_approval: boolean;
+  status: string; result: string | null; created_at: string; decided_at: string | null;
+}
+export interface AutopilotRun {
+  id: string; started_at: string; finished_at: string | null; checks_run: string[];
+  findings_count: number; actions_count: number; status: string; summary: string | null;
+}
+export const runAutopilotNow = (tid: string) => apiFetch<{ run_id: string; findings: number; auto_resolved: number; summary: string }>(`/tenants/${tid}/autopilot/run-now`, { method: "POST" });
+export const listAutopilotActions = (tid: string, statusFilter?: string) => apiFetch<AutopilotAction[]>(`/tenants/${tid}/autopilot/actions${statusFilter ? `?status_filter=${statusFilter}` : ""}`);
+export const listAutopilotRuns = (tid: string) => apiFetch<AutopilotRun[]>(`/tenants/${tid}/autopilot/runs`);
+export const approveAutopilotAction = (tid: string, id: string) => apiFetch<{ ok: boolean; result: string }>(`/tenants/${tid}/autopilot/actions/${id}/approve`, { method: "POST" });
+export const rejectAutopilotAction = (tid: string, id: string) => apiFetch<{ ok: boolean }>(`/tenants/${tid}/autopilot/actions/${id}/reject`, { method: "POST" });

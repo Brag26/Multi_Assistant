@@ -9,7 +9,7 @@ from sqlalchemy import (
     Boolean, DateTime, Enum, ForeignKey, Index, Integer,
     Numeric, String, Text, UniqueConstraint, func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.security import Role
@@ -146,6 +146,57 @@ class IntegrationAssetModel(Base):
     owner_user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), index=True)  # which Vapi account synced this
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     __table_args__ = (UniqueConstraint("tenant_id", "provider", "external_id", name="uq_integration_assets_external"),)
+
+
+class AutopilotRunModel(Base):
+    """One pass of the scheduled Autopilot ops check."""
+    __tablename__ = "autopilot_runs"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checks_run: Mapped[list] = mapped_column(ARRAY(String), default=list)
+    findings_count: Mapped[int] = mapped_column(Integer, default=0)
+    actions_count: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(20), default="running")
+    summary: Mapped[str | None] = mapped_column(Text)
+
+
+class AutopilotActionModel(Base):
+    """A single finding/action from an Autopilot run. Safe, reversible
+    actions execute immediately (status=auto_executed); anything touching
+    money or account status sits here as pending until a superadmin
+    approves or rejects it."""
+    __tablename__ = "autopilot_actions"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    run_id: Mapped[str | None] = mapped_column(ForeignKey("autopilot_runs.id", ondelete="SET NULL"))
+    check_name: Mapped[str] = mapped_column(String(60), nullable=False)
+    action_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(40))
+    target_id: Mapped[str | None] = mapped_column(String(120))
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    detail: Mapped[str] = mapped_column(Text, default="")
+    requires_approval: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)  # pending | approved | rejected | auto_executed | failed
+    result: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_by_user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+
+
+class SupportToolCallModel(Base):
+    """Audit trail of real actions the Support chatbot took via Vapi's
+    native function-calling, for transparency into what the bot actually did
+    (not just what it said)."""
+    __tablename__ = "support_tool_calls"
+    id: Mapped[str] = mapped_column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False))
+    tool_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    arguments: Mapped[dict] = mapped_column(JSONB, default=dict)
+    result: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class PlatformCostConfigModel(Base):

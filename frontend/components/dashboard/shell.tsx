@@ -260,6 +260,12 @@ export function DashboardShell({ children }: Props) {
                       <LifeBuoy className="w-4 h-4" /> Support Chatbot
                     </Link>
                   )}
+                  {isSuperAdmin && (
+                    <Link href="/superadmin/autopilot" onClick={() => setMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <Sparkles className="w-4 h-4" /> Autopilot
+                    </Link>
+                  )}
                 </>
               )}
               <div className="border-t border-slate-100 dark:border-slate-800" />
