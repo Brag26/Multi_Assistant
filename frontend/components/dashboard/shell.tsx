@@ -278,8 +278,12 @@ export function DashboardShell({ children }: Props) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto px-6 py-6">
+      <main className="flex-1 overflow-y-auto relative">
+        <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+          <div className="aurora-blob-1 absolute top-[-10%] left-[10%] w-96 h-96 rounded-full bg-gradient-to-br from-indigo-400/10 to-purple-400/5 blur-3xl" />
+          <div className="aurora-blob-2 absolute bottom-[-10%] right-[10%] w-96 h-96 rounded-full bg-gradient-to-br from-pink-400/10 to-indigo-400/5 blur-3xl" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-6 py-6">
           {children}
         </div>
       </main>

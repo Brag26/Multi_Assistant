@@ -152,3 +152,33 @@ body {
 .spotlight-card:hover::before {
   opacity: 1;
 }
+
+/* Every page heading inside the dashboard shell gets the shiny gradient
+ * treatment automatically — this is what makes the "all pages" upgrade
+ * possible without editing 40+ individual page files. */
+main h1, main h2 {
+  background: linear-gradient(90deg, #4f46e5 0%, #9333ea 25%, #db2777 50%, #9333ea 75%, #4f46e5 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shinyText 8s linear infinite;
+}
+.dark main h1, .dark main h2 {
+  background: linear-gradient(90deg, #818cf8 0%, #c084fc 25%, #f472b6 50%, #c084fc 75%, #818cf8 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shinyText 8s linear infinite;
+}
+/* Icons commonly sit inside headings (<h1><Icon/> Title</h1>) — since they
+ * use currentColor, they'd otherwise inherit the transparent text color
+ * above and disappear. Give them a real, visible color explicitly. */
+main h1 svg, main h2 svg {
+  color: #6366f1;
+  -webkit-text-fill-color: initial;
+}
+.dark main h1 svg, .dark main h2 svg {
+  color: #a5b4fc;
+}
