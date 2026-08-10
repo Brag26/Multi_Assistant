@@ -56,7 +56,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <main className="min-h-screen flex">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col justify-between p-12"
         style={{ background: "linear-gradient(135deg, #0f0c29, #1a1a4e, #24243e)" }}>

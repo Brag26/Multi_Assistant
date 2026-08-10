@@ -200,6 +200,41 @@ class IntegrationService:
 
         return merged_assets
 
+    async def refresh_vapi_numbers(self, user: Principal, tenant_id: str):
+        """Sync phone numbers bought/imported directly inside Vapi — for
+        tenants that connect straight to Vapi instead of a separate telephony
+        provider like Twilio."""
+        self._can_manage(user, tenant_id)
+        all_integrations = await self.integrations.list(tenant_id)
+        vapi_connections = [
+            i for i in all_integrations
+            if i.provider == IntegrationProvider.VAPI and i.disconnected_at is None and i.config.get("api_key")
+        ]
+
+        merged_assets = None
+        if vapi_connections:
+            for conn in vapi_connections:
+                client = VapiClient(api_key=conn.config["api_key"])
+                numbers = await client.fetch_phone_numbers()
+                assets = [
+                    {"external_id": item.get("id"), "label": item.get("number") or item.get("id"), "payload": item}
+                    for item in numbers if item.get("id")
+                ]
+                merged_assets = await self.integrations.upsert_assets(
+                    tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=conn.owner_user_id, kind="phone_number",
+                )
+        else:
+            numbers = await VapiClient().fetch_phone_numbers()
+            assets = [
+                {"external_id": item.get("id"), "label": item.get("number") or item.get("id"), "payload": item}
+                for item in numbers if item.get("id")
+            ]
+            merged_assets = await self.integrations.upsert_assets(
+                tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=None, kind="phone_number",
+            )
+
+        return merged_assets
+
     async def refresh_twilio_numbers(self, user: Principal, tenant_id: str):
         self._can_manage(user, tenant_id)
         numbers = await TwilioClient().fetch_phone_numbers()
@@ -217,9 +252,9 @@ class IntegrationService:
         await MakeClient().trigger_workflow(str(data.webhook_url), data.payload)
         return await self.integrations.log_webhook(tenant_id, IntegrationProvider.MAKE, "outbound", data.payload, 202, "scenario.triggered")
 
-    async def assets(self, user: Principal, tenant_id: str, provider: IntegrationProvider):
+    async def assets(self, user: Principal, tenant_id: str, provider: IntegrationProvider, kind: str | None = None):
         require_tenant_access(user, tenant_id)
-        return await self.integrations.list_assets(tenant_id, provider)
+        return await self.integrations.list_assets(tenant_id, provider, kind=kind)
 
     async def webhook_logs(self, user: Principal, tenant_id: str, provider: IntegrationProvider | None):
         require_tenant_access(user, tenant_id)

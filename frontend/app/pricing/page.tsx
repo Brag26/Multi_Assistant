@@ -22,7 +22,7 @@ export default function PricingPage() {
   useEffect(() => { listPlans().then(setPlans); }, []);
 
   return (
-    <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }} className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <span className="font-bold text-slate-800 text-lg flex items-center gap-2">

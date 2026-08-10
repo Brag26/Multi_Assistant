@@ -218,7 +218,7 @@ export default function WorkflowTemplatesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
 
         {/* Header */}

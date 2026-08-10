@@ -129,7 +129,7 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated, editingCa
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}
-        style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-slate-800 flex items-center gap-2">
             <Megaphone className="w-4 h-4 text-indigo-600" /> {editingCampaign ? "Edit Campaign" : "New Campaign"}

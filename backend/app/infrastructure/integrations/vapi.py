@@ -19,6 +19,16 @@ class VapiClient:
             data = response.json()
             return data if isinstance(data, list) else data.get("data", [])
 
+    async def fetch_phone_numbers(self) -> list[dict]:
+        """Numbers bought/imported directly inside Vapi (as opposed to a
+        separate Twilio/Exotel/etc. connection) — lets a tenant that connects
+        straight to Vapi sync its numbers the same way it syncs assistants."""
+        async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=20) as client:
+            response = await client.get("/phone-number", headers=self._headers())
+            response.raise_for_status()
+            data = response.json()
+            return data if isinstance(data, list) else data.get("data", [])
+
     async def get_recording_url(self, provider_call_id: str, kind: str = "mono-recording") -> str | None:
         """As of July 2026, Vapi requires an authenticated request to download
         recordings — the recordingUrl from webhooks/GET /call no longer works

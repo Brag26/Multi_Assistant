@@ -3,6 +3,7 @@
 import { useSessionStore } from "@/store/session";
 import { connectIntegration } from "@/lib/api";
 import { getCalendarOAuthUrl } from "@/lib/api-features";
+import { useMyRole } from "@/lib/useMyRole";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
@@ -96,7 +97,6 @@ export default function OnboardingPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeCategory, setActiveCategory] = useState<string>("voiceai");
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const [accounts, setAccounts] = useState<{ user_id: string; display_name: string | null; email: string; role: string }[]>([]);
@@ -104,19 +104,8 @@ export default function OnboardingPage() {
   // This wizard configures shared telephony/AI-vendor credentials for the whole
   // platform — only superadmin should reach it. Clients/resellers just use
   // whatever setup they're assigned; they don't configure it themselves.
-  useEffect(() => {
-    import("@/lib/supabase").then(({ createSupabaseBrowserClient }) => {
-      const supabase = createSupabaseBrowserClient();
-      supabase.auth.getSession().then(async ({ data }: any) => {
-        const token = data.session?.access_token;
-        if (!token) { setRole(""); return; }
-        try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`, { headers: { Authorization: `Bearer ${token}` } });
-          setRole(res.ok ? (await res.json()).role ?? "" : "");
-        } catch { setRole(""); }
-      });
-    });
-  }, []);
+  const { data: myStatus, isLoading: roleLoading } = useMyRole();
+  const role = roleLoading ? null : (myStatus?.role ?? "");
 
   useEffect(() => {
     if (role !== "super_admin") return;
@@ -168,6 +157,16 @@ function editProfile(p: { name: string; owner_user_id: string | null }) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// Next unused "Setup N" label — used whenever the Profile Name field is left
+// blank, so a new setup never silently falls back to the provider's default
+// name (e.g. "Vapi") and overwrites whatever setup already used that name.
+function nextSetupName(): string {
+  const used = new Set(profiles.map(p => p.name));
+  let n = profiles.length + 1;
+  while (used.has(`Setup ${n}`)) n++;
+  return `Setup ${n}`;
+}
+
 async function deleteProfile(p: { name: string; owner_user_id: string | null }) {
   const key = `${p.name}::${p.owner_user_id ?? ""}`;
   setDeletingProfile(key);
@@ -203,12 +202,17 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
         window.location.href = res.url;
         return;
       }
-      let payload: Record<string, unknown> = { ...fields, name: profileName || undefined, owner_user_id: ownerUserId || undefined };
+      // Never send a blank name — an empty name collapses to the provider's
+      // default name on the backend, which silently overwrites any existing
+      // setup that also has no name instead of creating a new one.
+      const effectiveName = profileName.trim() || nextSetupName();
+      if (effectiveName !== profileName) setProfileName(effectiveName);
+      let payload: Record<string, unknown> = { ...fields, name: effectiveName, owner_user_id: ownerUserId || undefined };
       if (provider.id === "slack") {
         const { configureSlack } = await import("@/lib/api-features");
         await configureSlack(tenantId, { webhook_url: fields.webhook_url, channel: fields.channel });
       } else if (provider.id === "twilio") {
-        payload = { account_sid: fields.account_sid, auth_token: fields.auth_token, config: { phone: fields.phone_number }, name: profileName || undefined, owner_user_id: ownerUserId || undefined };
+        payload = { account_sid: fields.account_sid, auth_token: fields.auth_token, config: { phone: fields.phone_number }, name: effectiveName, owner_user_id: ownerUserId || undefined };
         await connectIntegration(tenantId, "twilio", payload);
       } else {
         await connectIntegration(tenantId, provider.id, payload);
@@ -231,7 +235,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
   }
   if (role !== "super_admin") {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="max-w-sm text-center">
           <h1 className="text-lg font-semibold text-slate-800 mb-2">Setup is managed by your admin</h1>
           <p className="text-sm text-slate-500 mb-4">Voice/telephony setup is configured by your administrator and assigned to your account — you don't need to set anything up here.</p>
@@ -242,7 +246,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
   }
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="min-h-screen bg-slate-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         <div className="flex items-center justify-between mb-8">
@@ -292,7 +296,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Saved Setups ({profiles.length})</h2>
-              <button onClick={() => { setProfileName(""); setOwnerUserId(""); }}
+              <button onClick={() => { setProfileName(nextSetupName()); setOwnerUserId(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                 className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
                 + New Setup
               </button>
@@ -324,7 +328,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
               })}
             </div>
             <p className="mt-2 text-[11px] text-slate-400">
-              To create a new setup, clear the Profile Name above and enter a new one — Setup 1, Setup 2, Setup 3, however many you need.
+              Click "+ New Setup" above to start a fresh setup — a unique name is filled in automatically, or you can type your own (e.g. "Real Estate Cold Calling").
             </p>
           </div>
         )}

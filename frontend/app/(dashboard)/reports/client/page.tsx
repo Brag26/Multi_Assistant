@@ -282,7 +282,7 @@ export default function ClientReportPage() {
 
   return (
     <DashboardShell>
-      <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div>
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

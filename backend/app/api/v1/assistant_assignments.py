@@ -45,6 +45,7 @@ async def list_assistants_for_me(
             select(IntegrationAssetModel).where(
                 IntegrationAssetModel.tenant_id == tenant_id,
                 IntegrationAssetModel.provider == IntegrationProvider.VAPI,
+                IntegrationAssetModel.kind == "assistant",
             )
         )
         assets = assets_result.scalars().all()

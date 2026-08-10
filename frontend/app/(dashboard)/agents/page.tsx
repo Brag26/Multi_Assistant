@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSessionStore } from "@/store/session";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { useMyRole } from "@/lib/useMyRole";
 import { Phone, Mic, Globe, RefreshCw, ExternalLink, Check, ChevronDown, ChevronUp, Zap, ArrowLeft } from "lucide-react";
 
 type VapiAgent = {
@@ -96,7 +97,7 @@ function SuperadminAgentsView() {
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="p-6 max-w-5xl mx-auto">
       <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
@@ -358,7 +359,7 @@ function FilteredAgentsView({ isReseller }: { isReseller: boolean }) {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="p-6 max-w-4xl mx-auto">
       <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
@@ -428,23 +429,8 @@ function FilteredAgentsView({ isReseller }: { isReseller: boolean }) {
 // ── Role-aware entry point ──────────────────────────────────────────────────
 
 export default function VapiAgentsPage() {
-  const [role, setRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    supabase.auth.getSession().then(async ({ data }) => {
-      const token = data.session?.access_token;
-      if (!token) { setRole(""); return; }
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setRole(res.ok ? (await res.json()).role ?? "" : "");
-      } catch {
-        setRole("");
-      }
-    });
-  }, []);
+  const { data: myStatus, isLoading } = useMyRole();
+  const role = isLoading ? null : (myStatus?.role ?? "");
 
   if (role === null) return <div className="p-6 text-sm text-slate-500">Loading…</div>;
   if (role === "super_admin") return <SuperadminAgentsView />;

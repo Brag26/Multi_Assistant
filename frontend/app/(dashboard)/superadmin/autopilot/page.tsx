@@ -82,7 +82,7 @@ export default function AutopilotPage() {
   const lastRun = runs[0];
 
   return (
-    <div className="p-6 max-w-5xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div className="p-6 max-w-5xl mx-auto">
       <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
@@ -112,7 +112,7 @@ export default function AutopilotPage() {
           <button
             onClick={handleRunNow}
             disabled={running}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-[length:200%_auto] hover:bg-[position:100%_0] shadow-lg shadow-indigo-500/25 disabled:opacity-50 transition-all duration-500"
+            className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 bg-[length:200%_auto] hover:bg-[position:100%_0] shadow-lg shadow-indigo-500/25 disabled:opacity-50 transition-all duration-500"
           >
             <RefreshCw className={`w-4 h-4 ${running ? "animate-spin" : ""}`} /> {running ? "Running…" : "Run Now"}
           </button>

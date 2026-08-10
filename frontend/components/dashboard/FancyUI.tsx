@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, type ReactNode } from "react";
 
-export function SpotlightCard({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function SpotlightCard({ children, className = "", style }: { children: ReactNode; className?: string; style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
@@ -14,7 +14,7 @@ export function SpotlightCard({ children, className = "" }: { children: ReactNod
   }
 
   return (
-    <div ref={ref} onMouseMove={handleMouseMove} className={`spotlight-card ${className}`}>
+    <div ref={ref} onMouseMove={handleMouseMove} style={style} className={`spotlight-card ${className}`}>
       {children}
     </div>
   );
@@ -51,8 +51,8 @@ export function BorderBeamCard({ children, className = "" }: { children: ReactNo
 export function AuroraBackground() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-2xl">
-      <div className="aurora-blob-1 absolute -top-24 -left-16 w-72 h-72 rounded-full bg-gradient-to-br from-indigo-400/40 to-purple-400/20 blur-3xl" />
-      <div className="aurora-blob-2 absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-gradient-to-br from-pink-400/30 to-indigo-400/20 blur-3xl" />
+      <div className="aurora-blob-1 absolute -top-24 -left-16 w-72 h-72 rounded-full bg-gradient-to-br from-indigo-400/40 to-violet-400/20 blur-3xl" />
+      <div className="aurora-blob-2 absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-gradient-to-br from-violet-400/30 to-indigo-400/20 blur-3xl" />
     </div>
   );
 }

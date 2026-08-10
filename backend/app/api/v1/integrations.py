@@ -35,6 +35,10 @@ async def refresh_vapi_assistants(tenant_id: str, user: CurrentUser, service: An
 async def refresh_twilio_numbers(tenant_id: str, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)]):
     return await service.refresh_twilio_numbers(user, tenant_id)
 
+@router.post("/vapi/refresh-numbers", response_model=list[IntegrationAssetRead])
+async def refresh_vapi_numbers(tenant_id: str, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)]):
+    return await service.refresh_vapi_numbers(user, tenant_id)
+
 @router.post("/make/register-webhook", response_model=IntegrationRead, status_code=201)
 async def register_make_webhook(tenant_id: str, payload: IntegrationConnect, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)]):
     return await service.register_make_webhook(user, tenant_id, payload)
