@@ -1,7 +1,6 @@
 ﻿import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
-import { fontSans } from "./fonts";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={fontSans.variable}>
+    <html lang="en">
       <body>
         <Providers>{children}</Providers>
       </body>

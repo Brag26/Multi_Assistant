@@ -12,7 +12,6 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, PhoneCall, Users, CalendarCheck, Target } from "lucide-react";
-import { SpotlightCard, CountUp } from "@/components/dashboard/FancyUI";
 
 const OUTCOME_COLORS: Record<string, string> = {
   qualified:          "#10b981",
@@ -83,10 +82,10 @@ export default function AnalyticsPage() {
         <>
           {/* KPI cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <KpiCard icon={<PhoneCall className="w-5 h-5" />} label="Total Calls" value={data?.total_calls ?? 0} color="blue" delay={0} />
-            <KpiCard icon={<Target className="w-5 h-5" />} label="Completion Rate" value={`${completionPct}%`} color="emerald" delay={80} />
-            <KpiCard icon={<Users className="w-5 h-5" />} label="Total Contacts" value={data?.total_contacts ?? 0} color="violet" delay={160} />
-            <KpiCard icon={<CalendarCheck className="w-5 h-5" />} label="Appointments" value={data?.scheduled_appointments ?? 0} color="amber" delay={240} />
+            <KpiCard icon={<PhoneCall className="w-5 h-5" />} label="Total Calls" value={data?.total_calls ?? 0} color="blue" />
+            <KpiCard icon={<Target className="w-5 h-5" />} label="Completion Rate" value={`${completionPct}%`} color="emerald" />
+            <KpiCard icon={<Users className="w-5 h-5" />} label="Total Contacts" value={data?.total_contacts ?? 0} color="violet" />
+            <KpiCard icon={<CalendarCheck className="w-5 h-5" />} label="Appointments" value={data?.scheduled_appointments ?? 0} color="amber" />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-4 mb-4">
@@ -184,8 +183,8 @@ export default function AnalyticsPage() {
   );
 }
 
-function KpiCard({ icon, label, value, color, delay = 0 }: {
-  icon: React.ReactNode; label: string; value: string | number; color: string; delay?: number;
+function KpiCard({ icon, label, value, color }: {
+  icon: React.ReactNode; label: string; value: string | number; color: string;
 }) {
   const colors: Record<string, string> = {
     blue: "bg-blue-50 text-blue-600",
@@ -194,20 +193,15 @@ function KpiCard({ icon, label, value, color, delay = 0 }: {
     amber: "bg-amber-50 text-amber-600",
   };
   return (
-    <SpotlightCard
-      style={{ animationDelay: `${delay}ms` }}
-      className="animate-fade-in-up rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/5"
-    >
-      <div className="p-4 flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${colors[color]} dark:bg-opacity-10`}>{icon}</div>
+    <Card>
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${colors[color]}`}>{icon}</div>
         <div>
-          <p className="text-2xl font-bold tabular-nums">
-            {typeof value === "number" ? <CountUp value={value} /> : value}
-          </p>
+          <p className="text-2xl font-bold">{value}</p>
           <p className="text-xs text-slate-500">{label}</p>
         </div>
-      </div>
-    </SpotlightCard>
+      </CardContent>
+    </Card>
   );
 }
 

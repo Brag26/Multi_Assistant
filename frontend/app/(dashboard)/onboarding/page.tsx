@@ -3,7 +3,6 @@
 import { useSessionStore } from "@/store/session";
 import { connectIntegration } from "@/lib/api";
 import { getCalendarOAuthUrl } from "@/lib/api-features";
-import { useMyRole } from "@/lib/useMyRole";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import {
@@ -97,6 +96,7 @@ export default function OnboardingPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeCategory, setActiveCategory] = useState<string>("voiceai");
   const [loading, setLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const [accounts, setAccounts] = useState<{ user_id: string; display_name: string | null; email: string; role: string }[]>([]);
@@ -104,8 +104,19 @@ export default function OnboardingPage() {
   // This wizard configures shared telephony/AI-vendor credentials for the whole
   // platform — only superadmin should reach it. Clients/resellers just use
   // whatever setup they're assigned; they don't configure it themselves.
-  const { data: myStatus, isLoading: roleLoading } = useMyRole();
-  const role = roleLoading ? null : (myStatus?.role ?? "");
+  useEffect(() => {
+    import("@/lib/supabase").then(({ createSupabaseBrowserClient }) => {
+      const supabase = createSupabaseBrowserClient();
+      supabase.auth.getSession().then(async ({ data }: any) => {
+        const token = data.session?.access_token;
+        if (!token) { setRole(""); return; }
+        try {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`, { headers: { Authorization: `Bearer ${token}` } });
+          setRole(res.ok ? (await res.json()).role ?? "" : "");
+        } catch { setRole(""); }
+      });
+    });
+  }, []);
 
   useEffect(() => {
     if (role !== "super_admin") return;
@@ -235,7 +246,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
   }
   if (role !== "super_admin") {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="max-w-sm text-center">
           <h1 className="text-lg font-semibold text-slate-800 mb-2">Setup is managed by your admin</h1>
           <p className="text-sm text-slate-500 mb-4">Voice/telephony setup is configured by your administrator and assigned to your account — you don't need to set anything up here.</p>
@@ -246,7 +257,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         <div className="flex items-center justify-between mb-8">

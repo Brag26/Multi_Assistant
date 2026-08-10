@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import { useMyRole } from "@/lib/useMyRole";
 import { Plus, X, Trash2, Users, Shield, User, AlertTriangle, ArrowLeft, KeyRound } from "lucide-react";
 import Link from "next/link";
 
@@ -32,15 +31,25 @@ export default function UsersPage() {
   const [filterRole, setFilterRole] = useState("all");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [currentRole, setCurrentRole] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", display_name: "", role: "agent", password: "" });
-  const { data: myStatus } = useMyRole();
-  const currentRole = myStatus?.role ?? "";
 
   async function getToken() {
     const supabase = createSupabaseBrowserClient();
     const { data } = await supabase.auth.getSession();
     return data.session?.access_token ?? "";
+  }
+
+  async function fetchCurrentRole() {
+    const token = await getToken();
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setCurrentRole(data.role ?? "");
+    }
   }
 
   async function fetchUsers() {
@@ -54,6 +63,7 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
+    fetchCurrentRole();
     fetchUsers();
   }, []);
 
@@ -137,7 +147,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
       <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard

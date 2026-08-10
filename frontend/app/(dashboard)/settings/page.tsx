@@ -41,7 +41,7 @@ export default function SettingsPage() {
 
   return (
     <DashboardShell>
-      <div>
+      <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="mb-6">
           <p className="text-sm font-medium text-indigo-600">Account</p>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">

@@ -6,7 +6,6 @@ import { useSessionStore } from "@/store/session";
 import { getAnalytics } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent } from "@/components/ui/card";
-import { SpotlightCard } from "@/components/dashboard/FancyUI";
 import {
   TrendingUp, IndianRupee, PhoneCall, Users, Calendar,
   Target, ArrowUpRight, Info, Download, Share2,
@@ -165,7 +164,7 @@ export default function ROIDashboardPage() {
 
   return (
     <DashboardShell>
-      <div>
+      <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -203,20 +202,20 @@ export default function ROIDashboardPage() {
               {days}-Day Performance Summary
             </p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="animate-fade-in-up" style={{ animationDelay: "0ms" }}>
+              <div>
                 <p className="text-4xl font-bold text-white">{totalCalls.toLocaleString()}</p>
                 <p className="text-slate-400 text-sm mt-1">Calls Made by AI</p>
               </div>
-              <div className="animate-fade-in-up" style={{ animationDelay: "60ms" }}>
+              <div>
                 <p className="text-4xl font-bold text-emerald-400">{fmt(revenueGenerated, curr)}</p>
                 <p className="text-slate-400 text-sm mt-1">Estimated Revenue</p>
               </div>
-              <div className="animate-fade-in-up" style={{ animationDelay: "120ms" }}>
+              <div>
                 <p className="text-4xl font-bold text-indigo-300">{fmt(moneySaved, curr)}</p>
                 <p className="text-slate-400 text-sm mt-1">Saved vs Human Callers</p>
               </div>
-              <div className="animate-fade-in-up" style={{ animationDelay: "180ms" }}>
-                <p className="text-4xl font-bold text-violet-400">
+              <div>
+                <p className="text-4xl font-bold text-pink-400">
                   {roiPercent > 0 ? `${roiPercent.toFixed(0)}%` : "N/A"}
                 </p>
                 <p className="text-slate-400 text-sm mt-1">Total ROI</p>
@@ -227,13 +226,9 @@ export default function ROIDashboardPage() {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {kpis.map((kpi, i) => (
-            <SpotlightCard
-              key={kpi.label}
-              style={{ animationDelay: `${i * 80}ms` }}
-              className="animate-fade-in-up rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/5"
-            >
-              <div className="p-4">
+          {kpis.map(kpi => (
+            <Card key={kpi.label}>
+              <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-medium text-slate-500">{kpi.label}</p>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -243,8 +238,8 @@ export default function ROIDashboardPage() {
                 </div>
                 <p className="text-2xl font-bold text-slate-800">{kpi.value}</p>
                 <p className="text-xs text-slate-500 mt-1">{kpi.sub}</p>
-              </div>
-            </SpotlightCard>
+              </CardContent>
+            </Card>
           ))}
         </div>
 

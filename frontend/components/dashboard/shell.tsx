@@ -16,7 +16,6 @@ import { useTheme } from "@/components/theme-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 import { getMyFeatures } from "@/lib/api";
-import { useMyRole } from "@/lib/useMyRole";
 import { SupportChatWidget } from "@/components/dashboard/SupportChatWidget";
 
 interface NavItem { href: Route; label: string; icon: LucideIcon; }
@@ -80,7 +79,6 @@ export function DashboardShell({ children }: Props) {
   const { theme, toggleTheme } = useTheme();
   const [userEmail, setUserEmail] = useState("");
   const [userRole, setUserRole] = useState("");
-  const { data: myStatus } = useMyRole();
   const [allowedFeatures, setAllowedFeatures] = useState<string[] | null>(null); // null = not loaded yet (show all while loading)
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -98,11 +96,21 @@ export function DashboardShell({ children }: Props) {
     supabase.auth.getUser().then(({ data }) => {
       setUserEmail(data.user?.email ?? "");
     });
+    supabase.auth.getSession().then(async ({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) return;
+      try {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.ok) {
+          const { role } = await res.json();
+          setUserRole(role ?? "");
+        }
+      } catch {}
+    });
   }, []);
-
-  useEffect(() => {
-    if (myStatus?.role) setUserRole(myStatus.role);
-  }, [myStatus?.role]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -117,9 +125,6 @@ export function DashboardShell({ children }: Props) {
   async function handleSignOut() {
     const supabase = createSupabaseBrowserClient();
     await supabase.auth.signOut();
-    // Clear the middleware's cached approval/role status so a different
-    // account signing in right after doesn't briefly inherit this one's.
-    document.cookie = "approval_status_cache=; Max-Age=0; path=/";
     router.push("/login");
   }
 
@@ -169,20 +174,16 @@ export function DashboardShell({ children }: Props) {
                 {group.label}
               </p>
               <div className="space-y-0.5">
-                {group.items.map((item, i) => {
+                {group.items.map(item => {
                   const active = pathname === item.href || pathname.startsWith(item.href + "/");
                   return (
                     <Link key={item.href} href={item.href}
-                      style={{ animationDelay: `${i * 30}ms` }}
-                      className={`animate-fade-in-up group relative flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-150 ${
+                      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                         active
-                          ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium shadow-sm"
-                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 hover:translate-x-0.5"
+                          ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-medium"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
                       }`}>
-                      {active && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-full bg-indigo-600 dark:bg-indigo-400" />
-                      )}
-                      <item.icon className={`w-4 h-4 shrink-0 transition-transform duration-150 group-hover:scale-110 ${active ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`} />
+                      <item.icon className={`w-4 h-4 shrink-0 ${active ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"}`} />
                       {item.label}
                     </Link>
                   );
@@ -279,10 +280,10 @@ export function DashboardShell({ children }: Props) {
 
       <main className="flex-1 overflow-y-auto relative">
         <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
-          <div className="aurora-blob-1 absolute top-[-10%] left-[10%] w-96 h-96 rounded-full bg-gradient-to-br from-indigo-400/10 to-violet-400/5 blur-3xl" />
-          <div className="aurora-blob-2 absolute bottom-[-10%] right-[10%] w-96 h-96 rounded-full bg-gradient-to-br from-violet-400/10 to-indigo-400/5 blur-3xl" />
+          <div className="aurora-blob-1 absolute top-[-10%] left-[10%] w-96 h-96 rounded-full bg-gradient-to-br from-indigo-400/10 to-purple-400/5 blur-3xl" />
+          <div className="aurora-blob-2 absolute bottom-[-10%] right-[10%] w-96 h-96 rounded-full bg-gradient-to-br from-pink-400/10 to-indigo-400/5 blur-3xl" />
         </div>
-        <div className="relative max-w-7xl mx-auto px-6 py-6 animate-fade-in-up">
+        <div className="relative max-w-7xl mx-auto px-6 py-6">
           {children}
         </div>
       </main>

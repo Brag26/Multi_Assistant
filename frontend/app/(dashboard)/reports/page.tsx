@@ -134,7 +134,7 @@ export default function ReportsPage() {
 
   return (
     <DashboardShell>
-      <div>
+      <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="mb-6">
           <p className="text-sm font-medium text-indigo-600">Analytics</p>
           <h1 className="text-2xl font-bold text-slate-800">Reports</h1>
@@ -281,9 +281,9 @@ export default function ReportsPage() {
                   { label: "Calls Made by AI", value: totalCalls.toLocaleString(), color: "text-white" },
                   { label: "Estimated Revenue", value: fmt(revenue, curr), color: "text-emerald-400" },
                   { label: "Saved vs Humans", value: fmt(savings > 0 ? savings : 0, curr), color: "text-indigo-300" },
-                  { label: "Total ROI", value: roi > 0 ? `${roi.toFixed(0)}%` : "N/A", color: "text-violet-400" },
-                ].map((s, i) => (
-                  <div key={s.label} className="animate-fade-in-up" style={{ animationDelay: `${i * 60}ms` }}>
+                  { label: "Total ROI", value: roi > 0 ? `${roi.toFixed(0)}%` : "N/A", color: "text-pink-400" },
+                ].map(s => (
+                  <div key={s.label}>
                     <p className={`text-3xl font-bold ${s.color}`}>{s.value}</p>
                     <p className="text-slate-400 text-sm mt-1">{s.label}</p>
                   </div>

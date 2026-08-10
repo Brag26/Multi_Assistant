@@ -39,7 +39,7 @@ export default function ResetPasswordPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-50 p-8"
-     >
+      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 mb-8">
           <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center">

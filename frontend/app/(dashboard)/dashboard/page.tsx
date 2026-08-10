@@ -9,7 +9,6 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PhoneCall, Users, CalendarCheck, Bell, Activity, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
 import { NotificationCenter } from "@/components/dashboard/NotificationCenter";
-import { SpotlightCard, CountUp } from "@/components/dashboard/FancyUI";
 
 export default function DashboardPage() {
   const tenantId = useSessionStore(s => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
@@ -102,24 +101,18 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {stats.map((s, i) => (
-          <SpotlightCard
-            key={s.label}
-            style={{ animationDelay: `${i * 80}ms` }}
-            className="animate-fade-in-up rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/5"
-          >
-            <div className="p-4 flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${s.bg} dark:bg-opacity-10`}>
+        {stats.map(s => (
+          <Card key={s.label}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${s.bg}`}>
                 <span className={s.color}>{s.icon}</span>
               </div>
               <div>
-                <p className="text-2xl font-bold tabular-nums">
-                  <CountUp value={s.value} />
-                </p>
+                <p className="text-2xl font-bold">{s.value}</p>
                 <p className="text-xs text-slate-500">{s.label}</p>
               </div>
-            </div>
-          </SpotlightCard>
+            </CardContent>
+          </Card>
         ))}
       </div>
 

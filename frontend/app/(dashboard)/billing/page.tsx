@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSessionStore } from "@/store/session";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
-import { useMyRole } from "@/lib/useMyRole";
 import {
   listPlans, getMySubscription, createCheckout, verifyRazorpayPayment,
   adminListAccounts, adminListPlans, adminUpdatePlan, adminAssignPlan,
@@ -27,12 +26,30 @@ const PLAN_ICONS: Record<BillingPlanId, typeof Zap> = {
   starter: Zap, growth: TrendingUp, pro: TrendingUp, enterprise: Building2,
 };
 
-/** Fetches the current user's role — shared cache via useMyRole so it isn't
- * re-fetched on top of what the dashboard shell and other pages already asked for. */
+/** Fetches the current user's role the same way the dashboard shell does. */
 function useUserRole() {
-  const { data, isLoading } = useMyRole();
-  if (isLoading) return null; // null = still loading, "" = unknown/unauthenticated
-  return data?.role ?? "";
+  const [role, setRole] = useState<string | null>(null);
+  useEffect(() => {
+    const supabase = createSupabaseBrowserClient();
+    supabase.auth.getSession().then(async ({ data }) => {
+      const token = data.session?.access_token;
+      if (!token) { setRole(""); return; }
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/approvals/me/status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const { role } = await res.json();
+          setRole(role ?? "");
+        } else {
+          setRole("");
+        }
+      } catch {
+        setRole("");
+      }
+    });
+  }, []);
+  return role; // null = still loading, "" = unknown/unauthenticated
 }
 
 export default function BillingPage() {
@@ -40,7 +57,7 @@ export default function BillingPage() {
   return (
     <DashboardShell>
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-      <div>
+      <div style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
         <div className="mb-6">
           <p className="text-sm font-medium text-indigo-600">Account</p>
           <h1 className="text-2xl font-bold text-slate-800">Billing & Usage</h1>

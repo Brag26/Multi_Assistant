@@ -7,7 +7,6 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, TrendingUp } from "lucide-react";
-import { SpotlightCard, CountUp } from "@/components/dashboard/FancyUI";
 
 function ScoreBar({ score }: { score: number }) {
   const color = score >= 70 ? "bg-emerald-500" : score >= 40 ? "bg-amber-500" : "bg-red-400";
@@ -58,24 +57,24 @@ export default function LeadScoringPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <SpotlightCard style={{ animationDelay: "0ms" }} className="animate-fade-in-up rounded-xl border border-slate-200 dark:border-slate-800 border-l-4 border-l-emerald-500 bg-white dark:bg-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/5">
-          <div className="p-3">
-            <p className="text-2xl font-bold text-emerald-600 tabular-nums"><CountUp value={highValue} /></p>
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardContent className="p-3">
+            <p className="text-2xl font-bold text-emerald-600">{highValue}</p>
             <p className="text-xs text-slate-500">High value (70–100)</p>
-          </div>
-        </SpotlightCard>
-        <SpotlightCard style={{ animationDelay: "80ms" }} className="animate-fade-in-up rounded-xl border border-slate-200 dark:border-slate-800 border-l-4 border-l-amber-400 bg-white dark:bg-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/5">
-          <div className="p-3">
-            <p className="text-2xl font-bold text-amber-600 tabular-nums"><CountUp value={medium} /></p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-amber-400">
+          <CardContent className="p-3">
+            <p className="text-2xl font-bold text-amber-600">{medium}</p>
             <p className="text-xs text-slate-500">Medium (40–69)</p>
-          </div>
-        </SpotlightCard>
-        <SpotlightCard style={{ animationDelay: "160ms" }} className="animate-fade-in-up rounded-xl border border-slate-200 dark:border-slate-800 border-l-4 border-l-red-400 bg-white dark:bg-slate-900 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-red-500/5">
-          <div className="p-3">
-            <p className="text-2xl font-bold text-red-500 tabular-nums"><CountUp value={low} /></p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-red-400">
+          <CardContent className="p-3">
+            <p className="text-2xl font-bold text-red-500">{low}</p>
             <p className="text-xs text-slate-500">Low (0–39)</p>
-          </div>
-        </SpotlightCard>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>

@@ -63,7 +63,7 @@ export function SupportChatWidget() {
   if (!configured) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div className="fixed bottom-5 right-5 z-50" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       {open ? (
         <div className="w-80 sm:w-96 h-[28rem] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-indigo-600 text-white shrink-0">

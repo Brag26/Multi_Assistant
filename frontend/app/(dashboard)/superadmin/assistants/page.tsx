@@ -133,7 +133,7 @@ export default function SuperadminAssistantsPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-indigo-600 mb-4">
         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
       </Link>
