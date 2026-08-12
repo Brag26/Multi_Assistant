@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # request actually came from Vapi. Left blank, verification is skipped
     # (with a loud warning) — the endpoint is unauthenticated in that case.
     vapi_webhook_secret: str = ""
+    # Free-tier alternative to Celery Beat: an external cron pinger (e.g.
+    # cron-job.org, free) hits POST /api/v1/internal/scheduler-tick every
+    # minute, carrying this secret, to launch any due scheduled campaigns.
+    # Render's free plan doesn't support Background Workers or Key Value
+    # (Redis), so Celery worker/beat can't run there at all.
+    internal_scheduler_secret: str = ""
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_webhook_secret: str = ""
