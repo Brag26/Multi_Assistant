@@ -5,8 +5,16 @@ class VapiClient:
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or settings.vapi_api_key
 
-    async def start_call(self, phone_number: str, assistant_id: str, metadata: dict) -> str:
+    async def start_call(self, phone_number: str, assistant_id: str, metadata: dict, phone_number_id: str | None = None) -> str:
         payload = {"assistantId": assistant_id, "customer": {"number": phone_number}, "metadata": metadata}
+        # Vapi needs to know which of your imported numbers to dial out
+        # from in order to set up the call's transport (Twilio/Vonage/SIP
+        # trunk). Without phoneNumberId, Vapi has to guess/fall back to
+        # some default number for the assistant, and if that fallback's
+        # own transport is misconfigured the call fails immediately with
+        # endedReason "call.start.error-get-transport" before ever ringing.
+        if phone_number_id:
+            payload["phoneNumberId"] = phone_number_id
         async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=20) as client:
             response = await client.post("/call", json=payload, headers=self._headers())
             response.raise_for_status()
@@ -15,6 +23,17 @@ class VapiClient:
     async def fetch_assistants(self) -> list[dict]:
         async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=20) as client:
             response = await client.get("/assistant", headers=self._headers())
+            response.raise_for_status()
+            data = response.json()
+            return data if isinstance(data, list) else data.get("data", [])
+
+    async def fetch_phone_numbers(self) -> list[dict]:
+        """Numbers already imported into this Vapi account (from Twilio,
+        Vonage, etc., or free Vapi numbers). Each has an `id` — the
+        `phoneNumberId` that /call requires to know which transport to
+        route an outbound call through."""
+        async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=20) as client:
+            response = await client.get("/phone-number", headers=self._headers())
             response.raise_for_status()
             data = response.json()
             return data if isinstance(data, list) else data.get("data", [])

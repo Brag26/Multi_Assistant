@@ -143,6 +143,12 @@ class IntegrationAssetModel(Base):
     external_id: Mapped[str] = mapped_column(String(180), nullable=False)
     label: Mapped[str] = mapped_column(String(180), nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    # Added in migration 0018 to distinguish synced assistants from synced
+    # phone numbers (both come from provider='vapi'). The model was never
+    # updated to match at the time, so `kind` was silently dropped on every
+    # write and every asset was read back as the column default
+    # ('assistant') regardless of what was actually synced.
+    kind: Mapped[str] = mapped_column(String(20), default="assistant")
     owner_user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), index=True)  # which Vapi account synced this
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     __table_args__ = (UniqueConstraint("tenant_id", "provider", "external_id", name="uq_integration_assets_external"),)
@@ -424,6 +430,7 @@ class CallModel(Base):
         default=CallOutcome.UNKNOWN,
     )
     provider_call_id: Mapped[str | None] = mapped_column(String(160), index=True)
+    ended_reason: Mapped[str | None] = mapped_column(String(120))
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

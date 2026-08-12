@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Download, FileText } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { DataTable } from "@/components/dashboard/data-table";
+import type { CallStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/store/session";
 import { listCalls, getRecordingUrl, type CallRecord } from "@/lib/api";
@@ -19,6 +20,31 @@ function downloadText(filename: string, content: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+const STATUS_STYLE: Record<CallStatus, string> = {
+  queued: "bg-slate-100 text-slate-600",
+  in_progress: "bg-blue-50 text-blue-700",
+  completed: "bg-emerald-50 text-emerald-700",
+  failed: "bg-red-50 text-red-700",
+  canceled: "bg-slate-100 text-slate-500",
+};
+
+// Vapi's raw endedReason codes aren't something a client should have to
+// decode themselves — show a plain-English reason for the common ones and
+// fall back to the raw code (still shown in full via the title tooltip).
+function friendlyEndedReason(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  const known: Record<string, string> = {
+    "call.start.error-get-transport": "Couldn't connect the outbound number (check Twilio setup)",
+    "call.start.error-vapifault-database-error": "Vapi internal error — retry or contact Vapi support",
+    "call.start.error-vapi-number-international": "International calling not enabled for this number",
+    "call.start.error-vapi-number-outbound-daily-limit": "Daily outbound limit reached for this number",
+    "assistant-not-found": "Assistant not found",
+    "customer-did-not-answer": "No answer",
+    "customer-busy": "Line busy",
+  };
+  return known[reason] ?? reason.replace(/[-_]/g, " ");
 }
 
 function transcriptFilename(row: CallRecord): string {
@@ -84,6 +110,31 @@ export default function CallsPage() {
             { key: "customer_phone", label: "Phone" },
             { key: "campaign_id", label: "Campaign" },
             { key: "assistant_id", label: "Assistant" },
+            {
+              key: "status",
+              label: "Status",
+              render: (row) => (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[row.status] ?? ""}`}>
+                  {row.status.replace("_", " ")}
+                </span>
+              ),
+            },
+            {
+              key: "ended_reason",
+              label: "Ended Reason",
+              render: (row) => {
+                const friendly = friendlyEndedReason(row.ended_reason);
+                if (!friendly) return <span className="text-slate-400">—</span>;
+                return (
+                  <span
+                    title={row.ended_reason ?? ""}
+                    className={row.status === "failed" ? "text-red-600 text-xs" : "text-slate-500 text-xs"}
+                  >
+                    {friendly}
+                  </span>
+                );
+              },
+            },
             { key: "duration_seconds", label: "Duration" },
             { key: "outcome", label: "Outcome" },
             { key: "summary", label: "Summary" },

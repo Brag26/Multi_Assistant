@@ -190,15 +190,42 @@ class IntegrationService:
                 client = VapiClient(api_key=conn.config["api_key"])
                 assistants = await client.fetch_assistants()
                 assets = [{"external_id": item.get("id"), "label": item.get("name") or item.get("id"), "payload": item} for item in assistants if item.get("id")]
-                merged_assets = await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=conn.owner_user_id)
+                merged_assets = await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=conn.owner_user_id, kind="assistant")
+                await self._sync_vapi_phone_numbers(tenant_id, client, owner_user_id=conn.owner_user_id)
         else:
             # No Vapi account explicitly connected via the Setup Wizard yet —
             # fall back to the platform's shared key, unowned (global) assets.
-            assistants = await VapiClient().fetch_assistants()
+            shared_client = VapiClient()
+            assistants = await shared_client.fetch_assistants()
             assets = [{"external_id": item.get("id"), "label": item.get("name") or item.get("id"), "payload": item} for item in assistants if item.get("id")]
-            merged_assets = await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=None)
+            merged_assets = await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=None, kind="assistant")
+            await self._sync_vapi_phone_numbers(tenant_id, shared_client, owner_user_id=None)
 
         return merged_assets
+
+    async def _sync_vapi_phone_numbers(self, tenant_id: str, client: VapiClient, owner_user_id: str | None):
+        """Syncs Vapi's own phone-number resources (imported Twilio/Vonage
+        numbers, free Vapi numbers) so we can resolve a raw phone number
+        like campaign.twilio_phone_number to the phoneNumberId that Vapi's
+        /call endpoint needs to build the call's transport. Without this,
+        outbound calls have no explicit phoneNumberId and Vapi falls back to
+        some default number, which is what caused call.start.error-get-
+        transport failures."""
+        try:
+            numbers = await client.fetch_phone_numbers()
+        except Exception as exc:
+            log.warning("integrations.vapi.phone_number_sync_failed", tenant_id=tenant_id, error=str(exc))
+            return
+        assets = [
+            {
+                "external_id": item.get("id"),
+                "label": item.get("number") or item.get("name") or item.get("id"),
+                "payload": item,
+            }
+            for item in numbers if item.get("id")
+        ]
+        if assets:
+            await self.integrations.upsert_assets(tenant_id, IntegrationProvider.VAPI, assets, owner_user_id=owner_user_id, kind="phone_number")
 
     async def refresh_twilio_numbers(self, user: Principal, tenant_id: str):
         self._can_manage(user, tenant_id)
@@ -219,7 +246,12 @@ class IntegrationService:
 
     async def assets(self, user: Principal, tenant_id: str, provider: IntegrationProvider):
         require_tenant_access(user, tenant_id)
-        return await self.integrations.list_assets(tenant_id, provider)
+        # Vapi assets now include both assistants and (since the transport
+        # fix) synced phone numbers in the same table. Existing callers of
+        # this endpoint (e.g. the assistant picker dropdown) expect only
+        # assistants, so keep that the default here.
+        kind = "assistant" if provider == IntegrationProvider.VAPI else None
+        return await self.integrations.list_assets(tenant_id, provider, kind=kind)
 
     async def webhook_logs(self, user: Principal, tenant_id: str, provider: IntegrationProvider | None):
         require_tenant_access(user, tenant_id)
@@ -304,15 +336,19 @@ async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user
             session.add(call)
             await session.flush()
             try:
+                from app.application.call_routing import resolve_phone_number_id
+                phone_number_id = await resolve_phone_number_id(session, tenant_id, from_number)
                 provider_call_id = await vapi.start_call(
                     contact.phone, campaign.vapi_assistant_id,
                     {"call_id": str(call.id), "campaign_id": campaign_id},
+                    phone_number_id=phone_number_id,
                 )
                 call.provider_call_id = provider_call_id
                 call.status = CallStatus.IN_PROGRESS
                 queued += 1
             except Exception as exc:
                 call.status = CallStatus.FAILED
+                call.ended_reason = str(exc)[:120]
                 log.warning("campaign.launch_now.dial_failed", contact_id=str(contact.id), error=str(exc))
             await session.commit()
 

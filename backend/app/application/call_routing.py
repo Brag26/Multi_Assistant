@@ -50,6 +50,30 @@ async def resolve_vapi_client(session: AsyncSession, tenant_id: str, assistant_i
     return VapiClient()
 
 
+async def resolve_phone_number_id(session: AsyncSession, tenant_id: str, from_number: str | None) -> str | None:
+    """Maps a raw outbound number (e.g. campaign.twilio_phone_number,
+    '+19297348240') to the Vapi phoneNumberId it was synced under, via
+    _sync_vapi_phone_numbers. Returns None if we don't have a match — the
+    caller falls back to Vapi's own default-number behavior in that case,
+    same as before this fix, rather than blocking the call outright."""
+    if not from_number:
+        return None
+    normalized = "".join(ch for ch in from_number if ch.isdigit() or ch == "+")
+    result = await session.execute(
+        select(IntegrationAssetModel).where(
+            IntegrationAssetModel.tenant_id == tenant_id,
+            IntegrationAssetModel.provider == IntegrationProvider.VAPI,
+            IntegrationAssetModel.kind == "phone_number",
+        )
+    )
+    for asset in result.scalars().all():
+        candidate = str(asset.payload.get("number") or "")
+        candidate_normalized = "".join(ch for ch in candidate if ch.isdigit() or ch == "+")
+        if candidate_normalized and candidate_normalized.lstrip("+") == normalized.lstrip("+"):
+            return asset.external_id
+    return None
+
+
 async def enforce_minute_limit(session: AsyncSession, tenant_id: str, user_id: str | None) -> None:
     """Blocks the call if the initiating user's active subscription has no
     minutes left. No-ops if they have no subscription at all (e.g. an

@@ -85,5 +85,5 @@ class SqlAlchemyCallRepository:
         call.status = CallStatus.FAILED
         call.ended_at = datetime.now(UTC)
         if reason:
-            call.metadata_["fail_reason"] = reason
+            call.ended_reason = reason
         await self.session.commit()

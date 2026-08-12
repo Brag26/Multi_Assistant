@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     vapi_api_key: str = ""
     vapi_base_url: str = "https://api.vapi.ai"
+    # Set this to the same value as the "secret" field on your Vapi
+    # assistant/org server URL config. Vapi sends it back as the
+    # `x-vapi-secret` header on every webhook call so we can verify the
+    # request actually came from Vapi. Left blank, verification is skipped
+    # (with a loud warning) — the endpoint is unauthenticated in that case.
+    vapi_webhook_secret: str = ""
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_webhook_secret: str = ""

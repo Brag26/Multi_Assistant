@@ -54,7 +54,15 @@ def _resolve_call_outcome(success_eval, structured_data: dict | None, transcript
 
 
 @router.post("/vapi")
-async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | None = None):
+async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | None = None, x_vapi_secret: str | None = Header(default=None)):
+    from app.core.config import settings
+    if settings.vapi_webhook_secret:
+        if x_vapi_secret != settings.vapi_webhook_secret:
+            await SqlAlchemyIntegrationRepository(session).log_webhook(tenant_id, IntegrationProvider.VAPI, "inbound", {"raw": "rejected — bad or missing x-vapi-secret"}, 401, "signature.invalid")
+            return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+    else:
+        log.warning("vapi.webhook.unverified", detail="VAPI_WEBHOOK_SECRET is not set — this endpoint is currently unauthenticated")
+
     payload = await request.json()
     event_type = payload.get("type")
     
@@ -106,6 +114,7 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
             )
 
             db_call.duration_seconds = int(duration) if duration else None
+            db_call.ended_reason = ended_reason or None
             db_call.transcript = transcript
             db_call.summary = analysis.get("summary") or summary
             db_call.recording_url = recording_url

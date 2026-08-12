@@ -87,7 +87,7 @@ class SqlAlchemyIntegrationRepository:
             await self.session.refresh(integration)
         return integration
 
-    async def upsert_assets(self, tenant_id: str, provider: IntegrationProvider, assets: List[dict], owner_user_id: str | None = None):
+    async def upsert_assets(self, tenant_id: str, provider: IntegrationProvider, assets: List[dict], owner_user_id: str | None = None, kind: str = "assistant"):
         for asset in assets:
             stmt = insert(IntegrationAssetModel).values(
                 tenant_id=tenant_id,
@@ -96,17 +96,21 @@ class SqlAlchemyIntegrationRepository:
                 label=asset["label"],
                 payload=asset.get("payload", {}),
                 owner_user_id=owner_user_id,
+                kind=asset.get("kind", kind),
                 synced_at=datetime.now(UTC),
             ).on_conflict_do_update(
                 constraint="uq_integration_assets_external",
-                set_={"label": asset["label"], "payload": asset.get("payload", {}), "owner_user_id": owner_user_id, "synced_at": datetime.now(UTC)},
+                set_={"label": asset["label"], "payload": asset.get("payload", {}), "owner_user_id": owner_user_id, "kind": asset.get("kind", kind), "synced_at": datetime.now(UTC)},
             )
             await self.session.execute(stmt)
         await self.session.commit()
-        return await self.list_assets(tenant_id, provider)
+        return await self.list_assets(tenant_id, provider, kind=kind)
 
-    async def list_assets(self, tenant_id: str, provider: IntegrationProvider):
-        result = await self.session.execute(select(IntegrationAssetModel).where(IntegrationAssetModel.tenant_id == tenant_id, IntegrationAssetModel.provider == provider).order_by(IntegrationAssetModel.label))
+    async def list_assets(self, tenant_id: str, provider: IntegrationProvider, kind: str | None = None):
+        stmt = select(IntegrationAssetModel).where(IntegrationAssetModel.tenant_id == tenant_id, IntegrationAssetModel.provider == provider)
+        if kind is not None:
+            stmt = stmt.where(IntegrationAssetModel.kind == kind)
+        result = await self.session.execute(stmt.order_by(IntegrationAssetModel.label))
         return result.scalars().all()
 
     async def log_webhook(self, tenant_id: str | None, provider: IntegrationProvider, direction: str, payload: dict, status_code: int | None = None, event_type: str | None = None):
