@@ -16,7 +16,14 @@ class SqlAlchemyCampaignRepository:
         return result.scalars().all()
 
     async def create(self, tenant_id: str, data: CampaignCreate):
-        campaign = CampaignModel(tenant_id=tenant_id, **data.model_dump(exclude={"contact_ids"}))
+        values = data.model_dump(exclude={"contact_ids"})
+        # A campaign created with a future scheduled_at must start life as
+        # "scheduled", not the column default of "draft" — otherwise the
+        # scheduler task (which only ever looks at status == SCHEDULED)
+        # will never pick it up, no matter how far in the past its
+        # scheduled_at falls.
+        values["status"] = CampaignStatus.SCHEDULED if values.get("scheduled_at") else CampaignStatus.DRAFT
+        campaign = CampaignModel(tenant_id=tenant_id, **values)
         self.session.add(campaign)
         await self.session.flush()
         await self.assign_contacts(campaign.id, data.contact_ids, commit=False)
@@ -29,6 +36,12 @@ class SqlAlchemyCampaignRepository:
         values = data.model_dump(exclude_unset=True, exclude={"contact_ids"})
         for key, value in values.items():
             setattr(campaign, key, value)
+        # Keep status in sync with scheduled_at for campaigns that haven't
+        # started yet: adding/changing a schedule time promotes draft ->
+        # scheduled, clearing it demotes scheduled -> draft. Campaigns that
+        # are already running/paused/completed/canceled are left alone.
+        if "scheduled_at" in values and campaign.status in (CampaignStatus.DRAFT, CampaignStatus.SCHEDULED):
+            campaign.status = CampaignStatus.SCHEDULED if values["scheduled_at"] else CampaignStatus.DRAFT
         if data.contact_ids is not None:
             await self.assign_contacts(campaign.id, data.contact_ids, commit=False)
         await self.session.commit()
