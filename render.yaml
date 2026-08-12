@@ -1,0 +1,87 @@
+# Render Blueprint — adds the background processing this app's code already
+# expects (celery_app.py / scheduler.py / tasks.py) but that was never
+# actually deployed. This does NOT touch your existing web service — it only
+# adds the three missing pieces:
+#
+#   1. A managed Redis instance (the message broker Celery needs)
+#   2. A Celery worker  — executes tasks when they fire
+#   3. A Celery beat    — triggers scheduled tasks (check-scheduled-campaigns
+#      every 60s, plus the retry queue, cron workflows, analytics, etc.)
+#
+# How to use:
+#   Render Dashboard → New → Blueprint → point it at this repo → it reads
+#   this file and proposes creating the 3 services below. Review and apply.
+#
+# After it's created, go into both new services (celery-worker and
+# celery-beat) and copy over the same environment variables your existing
+# web service already has: DATABASE_URL, VAPI_API_KEY, VAPI_WEBHOOK_SECRET,
+# TWILIO_* etc. — anything scheduler.py / tasks.py touches. The variables
+# marked `sync: false` below are placeholders Render will prompt you to
+# fill in when you apply the blueprint; everything else (Redis URLs) is
+# wired automatically between these three services.
+
+services:
+  - type: keyvalue
+    name: voice-ops-redis
+    ipAllowList: []      # only reachable by other services in this Render project, not the public internet
+    plan: starter
+
+  - type: worker
+    name: voice-ops-celery-worker
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerCommand: celery -A app.workers.celery_app worker --loglevel=info
+    plan: starter
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: voice-ops-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: voice-ops-redis
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: voice-ops-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: VAPI_API_KEY
+        sync: false
+      - key: VAPI_WEBHOOK_SECRET
+        sync: false
+
+  - type: worker
+    name: voice-ops-celery-beat
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    dockerCommand: celery -A app.workers.celery_app beat --loglevel=info
+    plan: starter
+    envVars:
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: voice-ops-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: voice-ops-redis
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: voice-ops-redis
+          property: connectionString
+      - key: DATABASE_URL
+        sync: false
+      - key: VAPI_API_KEY
+        sync: false
+      - key: VAPI_WEBHOOK_SECRET
+        sync: false
