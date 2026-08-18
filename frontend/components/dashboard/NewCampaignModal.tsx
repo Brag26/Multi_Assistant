@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Megaphone, X, Search } from "lucide-react";
 import { listMyAssistants, listContacts, createCampaign, updateCampaign, getCampaignContactIds, campaignAction, getMySettings, type Contact, type Campaign } from "@/lib/api";
-import { COMMON_TIMEZONES, detectBrowserTimezone, zonedDateTimeToUtcISOString } from "@/lib/timezones";
+import { COMMON_TIMEZONES, detectBrowserTimezone, zonedDateTimeToUtcISOString, utcIsoToZonedDateTimeLocal } from "@/lib/timezones";
 
 interface Props {
   tenantId: string;
@@ -31,14 +31,29 @@ export function NewCampaignModal({ tenantId, open, onClose, onCreated, editingCa
     setError(null);
     listMyAssistants(tenantId).then(setAssistants).catch(() => {});
     listContacts(tenantId).then(setContacts).catch(() => {});
-    getMySettings(tenantId).then((res) => { if (res.timezone) setTimezone(res.timezone); }).catch(() => {});
+    getMySettings(tenantId).then((res) => {
+      // Resolving the timezone here (not relying on the `timezone` state
+      // variable) matters: this .then() runs after the settings fetch
+      // completes, but the synchronous code below it would otherwise run
+      // with whatever `timezone` was set to at the moment this effect
+      // fired — the browser-detected default, not yet the account's
+      // actual saved timezone. Using `tz` directly avoids that stale value.
+      const tz = res.timezone || timezone;
+      setTimezone(tz);
+      if (editingCampaign?.scheduled_at) {
+        setScheduledAt(utcIsoToZonedDateTimeLocal(editingCampaign.scheduled_at, tz));
+      }
+    }).catch(() => {});
 
     if (editingCampaign) {
       setName(editingCampaign.name);
       setAssistantId(editingCampaign.vapi_assistant_id ?? "");
       if (editingCampaign.scheduled_at) {
         setStartMode("later");
-        setScheduledAt(new Date(editingCampaign.scheduled_at).toISOString().slice(0, 16));
+        // Placeholder using the browser/default timezone until the
+        // getMySettings() call above resolves and corrects it — avoids
+        // the field sitting empty for a moment.
+        setScheduledAt(utcIsoToZonedDateTimeLocal(editingCampaign.scheduled_at, timezone));
       } else {
         setStartMode("now");
         setScheduledAt("");

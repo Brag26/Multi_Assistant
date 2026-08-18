@@ -54,8 +54,25 @@ export function zonedDateTimeToUtcISOString(dateTimeLocal: string, timeZone: str
   return new Date(utcGuess.getTime() + diff).toISOString();
 }
 
-export function formatInTimezone(isoString: string, timeZone: string): string {
-  try {
+/** Inverse of zonedDateTimeToUtcISOString — takes a UTC ISO timestamp (as
+ * stored/returned by the backend) and produces a "YYYY-MM-DDTHH:mm" string
+ * representing that instant's wall-clock time in `timeZone`, suitable for
+ * populating a `datetime-local` input. Needed when editing an existing
+ * scheduled campaign: without this, the picker showed the UTC time instead
+ * of the time it was actually scheduled for, off by the zone's offset. */
+export function utcIsoToZonedDateTimeLocal(isoString: string, timeZone: string): string {
+  const date = new Date(isoString);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+export function formatInTimezone(isoString: string, timeZone: string): string {  try {
     return new Date(isoString).toLocaleString("en-US", {
       timeZone,
       dateStyle: "medium",
