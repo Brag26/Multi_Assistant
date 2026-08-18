@@ -157,10 +157,16 @@ class CallService:
         if wf is None or wf.vapi_assistant_id is None:
             raise HTTPException(status_code=400, detail="Workflow is not launchable")
 
-        from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+        from app.application.call_routing import enforce_minute_limit, resolve_vapi_client, resolve_vapi_phone_number_id
         from app.infrastructure.integrations.vapi import VapiCallError
         await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
         vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, wf.vapi_assistant_id)
+        from_number_id = await resolve_vapi_phone_number_id(self.calls.session, tenant_id, wf.twilio_phone_number)
+        if wf.twilio_phone_number and not from_number_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This workflow's phone number {wf.twilio_phone_number} isn't recognized by Vapi — sync numbers from Vapi (Manage Assistants → Sync from Vapi).",
+            )
 
         call = await self.calls.create_queued(
             tenant_id, workflow_id, request, assistant_id=wf.vapi_assistant_id, initiated_by_user_id=user.user_id
@@ -168,7 +174,7 @@ class CallService:
         try:
             provider_call_id = await vapi_client.start_call(
                 request.customer_phone, wf.vapi_assistant_id,
-                {"call_id": str(call.id), **request.metadata},
+                {"call_id": str(call.id), **request.metadata}, from_phone_number_id=from_number_id,
             )
         except VapiCallError as exc:
             await self.calls.mark_failed(call.id, reason=exc.message)
@@ -201,10 +207,21 @@ class CallService:
         )
         from_number = assignment_result.scalar_one_or_none()
 
-        from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+        from app.application.call_routing import enforce_minute_limit, resolve_vapi_client, resolve_vapi_phone_number_id
         from app.infrastructure.integrations.vapi import VapiCallError
         await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
         vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, assistant_id)
+        from_number_id = await resolve_vapi_phone_number_id(self.calls.session, tenant_id, from_number)
+        if from_number and not from_number_id:
+            # We have a raw number on file for this assignment, but it
+            # doesn't match any phone number actually synced from Vapi —
+            # Vapi needs its own phoneNumberId, not the raw digits, so this
+            # would fail with a confusing Vapi-side error otherwise. Catch
+            # it here with a clear message instead.
+            raise HTTPException(
+                status_code=400,
+                detail=f"Phone number {from_number} isn't recognized by Vapi — sync numbers from Vapi (Manage Assistants → Sync from Vapi) and make sure this assistant is assigned a synced number.",
+            )
 
         request = LaunchCallRequest(customer_phone=customer_phone)
         call = await self.calls.create_queued(
@@ -213,7 +230,7 @@ class CallService:
         )
         try:
             provider_call_id = await vapi_client.start_call(
-                customer_phone, assistant_id, {"call_id": str(call.id)},
+                customer_phone, assistant_id, {"call_id": str(call.id)}, from_phone_number_id=from_number_id,
             )
         except VapiCallError as exc:
             # Surface Vapi's actual reason instead of a generic 500 — this is

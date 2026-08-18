@@ -309,7 +309,7 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
     from sqlalchemy import select
     from app.domain.enums import CallStatus, CampaignStatus
     from app.infrastructure.db.models import CallModel, CampaignContactModel, ContactModel, DncListModel
-    from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+    from app.application.call_routing import enforce_minute_limit, resolve_vapi_client, resolve_vapi_phone_number_id
     from fastapi import HTTPException
 
     vapi = await resolve_vapi_client(session, tenant_id, campaign.vapi_assistant_id)
@@ -324,6 +324,17 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
             ).limit(1)
         )
         from_number = assignment_result.scalar_one_or_none()
+
+    from_number_id = await resolve_vapi_phone_number_id(session, tenant_id, from_number)
+    if from_number and not from_number_id:
+        # Same issue as Test Call: Vapi needs its own phoneNumberId, not the
+        # raw digits we have on file. Fail the whole campaign clearly up
+        # front instead of burning through every contact with the same
+        # doomed-to-fail call.
+        log.warning("campaign.launch_now.unrecognized_number", campaign_id=campaign_id, from_number=from_number)
+        campaign.status = CampaignStatus.PAUSED
+        await session.commit()
+        return
 
     contacts_result = await session.execute(
         select(ContactModel)
@@ -363,7 +374,7 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
         try:
             provider_call_id = await vapi.start_call(
                 contact.phone, campaign.vapi_assistant_id,
-                {"call_id": str(call.id), "campaign_id": campaign_id},
+                {"call_id": str(call.id), "campaign_id": campaign_id}, from_phone_number_id=from_number_id,
             )
             call.provider_call_id = provider_call_id
             call.status = CallStatus.IN_PROGRESS

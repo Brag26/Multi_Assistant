@@ -81,6 +81,31 @@ async def resolve_vapi_client(session: AsyncSession, tenant_id: str, assistant_i
     return VapiClient()
 
 
+async def resolve_vapi_phone_number_id(session: AsyncSession, tenant_id: str, raw_phone_number: str | None) -> str | None:
+    """Vapi's /call endpoint needs a phoneNumberId (its own resource ID for
+    the outbound number), not a raw E.164 string — but the rest of this app
+    (campaign.twilio_phone_number, AssistantAssignmentModel.phone_number)
+    only ever stores raw numbers. Look up the synced Vapi phone-number asset
+    whose actual number matches, and use its Vapi ID. Returns None if there's
+    no raw number to resolve, or nothing synced matches it — callers should
+    treat None as "can't place this call" rather than silently omitting the
+    field, since Vapi will reject the call outright without one."""
+    if not raw_phone_number:
+        return None
+    from app.domain.enums import IntegrationProvider
+    from app.infrastructure.db.models import IntegrationAssetModel
+
+    result = await session.execute(
+        select(IntegrationAssetModel.external_id).where(
+            IntegrationAssetModel.tenant_id == tenant_id,
+            IntegrationAssetModel.provider == IntegrationProvider.VAPI,
+            IntegrationAssetModel.kind == "phone_number",
+            IntegrationAssetModel.payload["number"].astext == raw_phone_number,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
 async def enforce_minute_limit(session: AsyncSession, tenant_id: str, user_id: str | None) -> None:
     """Blocks the call if the initiating user's active subscription has no
     minutes left. No-ops if they have no subscription at all (e.g. an

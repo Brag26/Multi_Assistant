@@ -15,8 +15,10 @@ class VapiClient:
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or settings.vapi_api_key
 
-    async def start_call(self, phone_number: str, assistant_id: str, metadata: dict) -> str:
+    async def start_call(self, phone_number: str, assistant_id: str, metadata: dict, from_phone_number_id: str | None = None) -> str:
         payload = {"assistantId": assistant_id, "customer": {"number": phone_number}, "metadata": metadata}
+        if from_phone_number_id:
+            payload["phoneNumberId"] = from_phone_number_id
         async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=20) as client:
             response = await client.post("/call", json=payload, headers=self._headers())
             if response.status_code >= 400:
