@@ -94,11 +94,9 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
     # in-flight lifecycle, and a separate final "end-of-call-report" with
     # the transcript/recording/analysis. Map both onto this app's existing
     # call.started / call.answered / call.ended handling below.
-    call_status = payload.get("call", {}).get("status")
+    call_status = payload.get("status")
     if event_type == "status-update" and call_status == "in-progress":
         event_type = "call.started"
-    elif event_type == "status-update" and call_status == "forwarding":
-        event_type = "call.answered"
     elif event_type == "end-of-call-report":
         event_type = "call.ended"
 
@@ -123,16 +121,28 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
             })
             
         elif event_type == "call.ended":
-            # Set outcome based on Vapi payload or end reason
-            ended_reason = payload.get("call", {}).get("endedReason", "")
-            duration = payload.get("call", {}).get("duration", 0)
-            transcript = payload.get("call", {}).get("transcript", "")
-            summary = payload.get("call", {}).get("summary", "")
-            analysis = payload.get("call", {}).get("analysis") or payload.get("analysis") or {}
+            # Per Vapi's own Server Events docs: on end-of-call-report,
+            # endedReason is top-level on the message (message.endedReason),
+            # NOT under message.call — that was wrong before, meaning
+            # ended_reason was always empty and every call defaulted to
+            # COMPLETED regardless of what actually happened. transcript and
+            # recording live under message.artifact, not message.call, too.
+            artifact = payload.get("artifact", {})
+            ended_reason = payload.get("endedReason", "")
+            duration = payload.get("call", {}).get("duration", 0) or artifact.get("duration", 0)
+            transcript = artifact.get("transcript", "")
+            summary = payload.get("summary") or payload.get("call", {}).get("summary", "")
+            analysis = payload.get("analysis") or payload.get("call", {}).get("analysis") or {}
+            recording = artifact.get("recording") or {}
             recording_url = (
-                payload.get("call", {}).get("recordingUrl")
+                recording.get("stereoUrl")
+                or (recording.get("mono") or {}).get("combinedUrl")
+                or recording.get("url")
+                # Fallbacks for older/alternate shapes, kept defensively
+                # since Vapi's recording object fields aren't fully
+                # documented in the events reference.
+                or payload.get("call", {}).get("recordingUrl")
                 or payload.get("recordingUrl")
-                or payload.get("artifact", {}).get("recordingUrl")
             )
 
             db_call.duration_seconds = int(duration) if duration else None

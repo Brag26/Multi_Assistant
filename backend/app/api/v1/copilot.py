@@ -200,14 +200,18 @@ async def copilot_tool_calls(tenant_id: str, request: Request, session: AsyncSes
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing webhook secret")
 
     payload = raw_payload.get("message", raw_payload)
-    tool_calls = payload.get("toolCallList") or payload.get("toolCalls") or []
+    # Per Vapi's Server Events docs, each item in toolCallList has id/name/
+    # parameters directly on it — there's no nested "function" object.
+    # (OpenAI's own function-calling API does nest it that way, which is
+    # almost certainly where that wrong assumption came from — Vapi's tool
+    # call webhook shape is its own thing, not a passthrough of OpenAI's.)
+    tool_calls = payload.get("toolCallList") or []
 
     results = []
     for call in tool_calls:
         call_id = call.get("id")
-        fn = call.get("function", {})
-        name = fn.get("name")
-        arguments = fn.get("arguments") or {}
+        name = call.get("name")
+        arguments = call.get("parameters") or call.get("arguments") or {}
         if isinstance(arguments, str):
             import json
             try:
@@ -217,13 +221,13 @@ async def copilot_tool_calls(tenant_id: str, request: Request, session: AsyncSes
 
         handler = TOOL_HANDLERS.get(name)
         if not handler:
-            results.append({"toolCallId": call_id, "error": f"Unknown tool: {name}"})
+            results.append({"name": name, "toolCallId": call_id, "error": f"Unknown tool: {name}"})
             continue
         try:
             result_str = await handler(session, tenant_id, **arguments)
-            results.append({"toolCallId": call_id, "result": result_str})
+            results.append({"name": name, "toolCallId": call_id, "result": result_str})
         except Exception as exc:
             log.error("copilot.tool_call.failed", tool=name, error=str(exc))
-            results.append({"toolCallId": call_id, "error": f"Tool failed: {exc}"[:300]})
+            results.append({"name": name, "toolCallId": call_id, "error": f"Tool failed: {exc}"[:300]})
 
     return {"results": results}
