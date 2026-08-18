@@ -171,6 +171,7 @@ class CallService:
                 {"call_id": str(call.id), **request.metadata},
             )
         except VapiCallError as exc:
+            await self.calls.mark_failed(call.id, reason=exc.message)
             raise HTTPException(status_code=400, detail=f"Vapi rejected the call: {exc.message}")
         await self.calls.mark_started(call.id, provider_call_id)
         if wf.make_webhook_url:
@@ -218,7 +219,10 @@ class CallService:
             # Surface Vapi's actual reason instead of a generic 500 — this is
             # what shows up in the Test Call modal, so a real explanation
             # (bad assistant, bad number format, no credits, etc.) is far
-            # more useful than "Internal server error".
+            # more useful than "Internal server error". Also mark the call
+            # row FAILED — leaving it QUEUED forever is what was causing
+            # every rejected test call to sit stuck at the top of the list.
+            await self.calls.mark_failed(call.id, reason=exc.message)
             raise HTTPException(status_code=400, detail=f"Vapi rejected the call: {exc.message}")
         await self.calls.mark_started(call.id, provider_call_id)
         return await self.calls.get(call.id)
