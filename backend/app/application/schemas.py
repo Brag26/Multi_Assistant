@@ -334,7 +334,6 @@ class CallRead(BaseModel):
     status: CallStatus
     outcome: CallOutcome
     provider_call_id: str | None
-    ended_reason: str | None
     duration_seconds: int | None
     started_at: datetime | None
     ended_at: datetime | None

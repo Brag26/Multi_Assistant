@@ -168,6 +168,16 @@ function editProfile(p: { name: string; owner_user_id: string | null }) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// Next unused "Setup N" label — used whenever the Profile Name field is left
+// blank, so a new setup never silently falls back to the provider's default
+// name (e.g. "Vapi") and overwrites whatever setup already used that name.
+function nextSetupName(): string {
+  const used = new Set(profiles.map(p => p.name));
+  let n = profiles.length + 1;
+  while (used.has(`Setup ${n}`)) n++;
+  return `Setup ${n}`;
+}
+
 async function deleteProfile(p: { name: string; owner_user_id: string | null }) {
   const key = `${p.name}::${p.owner_user_id ?? ""}`;
   setDeletingProfile(key);
@@ -203,12 +213,17 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
         window.location.href = res.url;
         return;
       }
-      let payload: Record<string, unknown> = { ...fields, name: profileName || undefined, owner_user_id: ownerUserId || undefined };
+      // Never send a blank name — an empty name collapses to the provider's
+      // default name on the backend, which silently overwrites any existing
+      // setup that also has no name instead of creating a new one.
+      const effectiveName = profileName.trim() || nextSetupName();
+      if (effectiveName !== profileName) setProfileName(effectiveName);
+      let payload: Record<string, unknown> = { ...fields, name: effectiveName, owner_user_id: ownerUserId || undefined };
       if (provider.id === "slack") {
         const { configureSlack } = await import("@/lib/api-features");
         await configureSlack(tenantId, { webhook_url: fields.webhook_url, channel: fields.channel });
       } else if (provider.id === "twilio") {
-        payload = { account_sid: fields.account_sid, auth_token: fields.auth_token, config: { phone: fields.phone_number }, name: profileName || undefined, owner_user_id: ownerUserId || undefined };
+        payload = { account_sid: fields.account_sid, auth_token: fields.auth_token, config: { phone: fields.phone_number }, name: effectiveName, owner_user_id: ownerUserId || undefined };
         await connectIntegration(tenantId, "twilio", payload);
       } else {
         await connectIntegration(tenantId, provider.id, payload);
@@ -292,7 +307,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Saved Setups ({profiles.length})</h2>
-              <button onClick={() => { setProfileName(""); setOwnerUserId(""); }}
+              <button onClick={() => { setProfileName(nextSetupName()); setOwnerUserId(""); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                 className="text-xs font-medium text-indigo-600 hover:text-indigo-700">
                 + New Setup
               </button>
@@ -324,7 +339,7 @@ async function deleteProfile(p: { name: string; owner_user_id: string | null }) 
               })}
             </div>
             <p className="mt-2 text-[11px] text-slate-400">
-              To create a new setup, clear the Profile Name above and enter a new one — Setup 1, Setup 2, Setup 3, however many you need.
+              Click "+ New Setup" above to start a fresh setup — a unique name is filled in automatically, or you can type your own (e.g. "Real Estate Cold Calling").
             </p>
           </div>
         )}

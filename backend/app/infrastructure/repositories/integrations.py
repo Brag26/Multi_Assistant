@@ -96,11 +96,11 @@ class SqlAlchemyIntegrationRepository:
                 label=asset["label"],
                 payload=asset.get("payload", {}),
                 owner_user_id=owner_user_id,
-                kind=asset.get("kind", kind),
+                kind=kind,
                 synced_at=datetime.now(UTC),
             ).on_conflict_do_update(
                 constraint="uq_integration_assets_external",
-                set_={"label": asset["label"], "payload": asset.get("payload", {}), "owner_user_id": owner_user_id, "kind": asset.get("kind", kind), "synced_at": datetime.now(UTC)},
+                set_={"label": asset["label"], "payload": asset.get("payload", {}), "owner_user_id": owner_user_id, "kind": kind, "synced_at": datetime.now(UTC)},
             )
             await self.session.execute(stmt)
         await self.session.commit()
@@ -108,7 +108,7 @@ class SqlAlchemyIntegrationRepository:
 
     async def list_assets(self, tenant_id: str, provider: IntegrationProvider, kind: str | None = None):
         stmt = select(IntegrationAssetModel).where(IntegrationAssetModel.tenant_id == tenant_id, IntegrationAssetModel.provider == provider)
-        if kind is not None:
+        if kind:
             stmt = stmt.where(IntegrationAssetModel.kind == kind)
         result = await self.session.execute(stmt.order_by(IntegrationAssetModel.label))
         return result.scalars().all()

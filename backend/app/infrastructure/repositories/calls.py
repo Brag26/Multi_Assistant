@@ -2,12 +2,12 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.schemas import LaunchCallRequest
 from app.domain.enums import CallStatus
-from app.infrastructure.db.models import CallModel
+from app.infrastructure.db.models import AssistantAssignmentModel, CallModel
 
 
 class SqlAlchemyCallRepository:
@@ -29,6 +29,50 @@ class SqlAlchemyCallRepository:
         limit: int = 100,
     ):
         stmt = select(CallModel).where(CallModel.tenant_id == tenant_id)
+        if campaign_id:
+            stmt = stmt.where(CallModel.campaign_id == campaign_id)
+        if contact_id:
+            stmt = stmt.where(CallModel.contact_id == contact_id)
+        if status_filter:
+            stmt = stmt.where(CallModel.status == status_filter)
+        stmt = stmt.order_by(CallModel.created_at.desc()).limit(limit)
+        result = await self.session.execute(stmt)
+        return result.scalars().all()
+
+    async def list_for_user(
+        self,
+        tenant_id: str,
+        user_id: str,
+        is_super_admin: bool,
+        campaign_id: str | None = None,
+        contact_id: str | None = None,
+        status_filter: str | None = None,
+        limit: int = 100,
+    ):
+        """Same as list_for_tenant, but scoped to what this account holder
+        actually owns — the assistants assigned to them, plus calls they
+        personally initiated — instead of every call in the tenant.
+        Superadmin gets this same scoping (their own assigned assistants),
+        plus any assistant nobody has claimed yet, since only superadmin can
+        dial those directly."""
+        assign_result = await self.session.execute(
+            select(AssistantAssignmentModel.assistant_external_id, AssistantAssignmentModel.assigned_to_user_id)
+            .where(AssistantAssignmentModel.tenant_id == tenant_id)
+        )
+        assignment_rows = assign_result.all()
+        my_assistant_ids = {row[0] for row in assignment_rows if row[1] == user_id}
+        all_assigned_ids = {row[0] for row in assignment_rows}
+
+        scope_conditions = [CallModel.initiated_by_user_id == user_id]
+        if my_assistant_ids:
+            scope_conditions.append(CallModel.assistant_id.in_(my_assistant_ids))
+        if is_super_admin:
+            unassigned_condition = CallModel.assistant_id.is_(None)
+            if all_assigned_ids:
+                unassigned_condition = or_(unassigned_condition, CallModel.assistant_id.notin_(all_assigned_ids))
+            scope_conditions.append(unassigned_condition)
+
+        stmt = select(CallModel).where(CallModel.tenant_id == tenant_id, or_(*scope_conditions))
         if campaign_id:
             stmt = stmt.where(CallModel.campaign_id == campaign_id)
         if contact_id:
@@ -85,5 +129,5 @@ class SqlAlchemyCallRepository:
         call.status = CallStatus.FAILED
         call.ended_at = datetime.now(UTC)
         if reason:
-            call.ended_reason = reason
+            call.metadata_["fail_reason"] = reason
         await self.session.commit()

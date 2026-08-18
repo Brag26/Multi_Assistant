@@ -24,7 +24,7 @@ from app.application.schemas import (
     NotificationRead,
     RealTimeDashboardRead,
 )
-from app.core.security import CurrentUser
+from app.core.security import CurrentUser, Role
 from app.infrastructure.db.session import AsyncSession
 from app.infrastructure.repositories.monitoring import (
     SqlAlchemyAnalyticsRepository,
@@ -285,7 +285,7 @@ async def get_realtime_dashboard(
     notif_repo = SqlAlchemyNotificationRepository(session)
 
     snapshot = await analytics_repo.get_dashboard_snapshot(tenant_id)
-    recent_calls = await call_repo.list_for_tenant(tenant_id, limit=10)
+    recent_calls = await call_repo.list_for_user(tenant_id, user.user_id, user.role == Role.SUPER_ADMIN, limit=10)
     recent_notifs = await notif_repo.list_for_tenant(tenant_id, unread_only=False, limit=10)
 
     return {

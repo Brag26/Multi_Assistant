@@ -270,19 +270,7 @@ class WorkflowExecutionEngine:
             self.session.add(call)
             await self.session.commit()
             try:
-                from app.application.call_routing import resolve_phone_number_id
-                from app.infrastructure.db.models import AssistantAssignmentModel
-                from_number = merged.get("from_number") or merged.get("twilio_phone_number")
-                if not from_number:
-                    assignment_result = await self.session.execute(
-                        select(AssistantAssignmentModel.phone_number).where(
-                            AssistantAssignmentModel.tenant_id == tenant_id,
-                            AssistantAssignmentModel.assistant_external_id == assistant_id,
-                        ).limit(1)
-                    )
-                    from_number = assignment_result.scalar_one_or_none()
-                phone_number_id = await resolve_phone_number_id(self.session, tenant_id, from_number)
-                prov_id = await self.vapi.start_call(phone, assistant_id, {"call_id": str(call.id)}, phone_number_id=phone_number_id)
+                prov_id = await self.vapi.start_call(phone, assistant_id, {"call_id": str(call.id)})
                 call.provider_call_id = prov_id
                 call.status = CallStatus.IN_PROGRESS
                 call.started_at = datetime.now(UTC)
@@ -290,7 +278,6 @@ class WorkflowExecutionEngine:
                 return {"call_id": str(call.id), "provider_call_id": prov_id}
             except Exception as exc:
                 call.status = CallStatus.FAILED
-                call.ended_reason = str(exc)[:120]
                 await self.session.commit()
                 raise
 

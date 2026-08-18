@@ -154,7 +154,6 @@ export interface CallRecord {
   customer_phone: string;
   status: CallStatus;
   outcome: string;
-  ended_reason?: string | null;
   duration_seconds?: number | null;
   transcript?: string | null;
   transcript_url?: string | null;
