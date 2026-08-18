@@ -25,6 +25,9 @@ async def resolve_vapi_client(session: AsyncSession, tenant_id: str, assistant_i
     the synced asset) and uses that account's own API key. Falls back to the
     platform's shared key for assistants synced before this feature existed,
     or synced with no specific account connected."""
+    import structlog
+    log = structlog.get_logger()
+
     asset_result = await session.execute(
         select(IntegrationAssetModel.owner_user_id).where(
             IntegrationAssetModel.tenant_id == tenant_id,
@@ -34,6 +37,24 @@ async def resolve_vapi_client(session: AsyncSession, tenant_id: str, assistant_i
     )
     owner_user_id = asset_result.scalar_one_or_none()
     if not owner_user_id:
+        # Unowned/shared asset — but "shared" doesn't mean "use the bare
+        # VAPI_API_KEY env var and hope it's set". The Setup Wizard stores
+        # its own shared connection's key in the database (an `integrations`
+        # row with owner_user_id NULL); that's very likely the actual key
+        # that synced this assistant in the first place. Use it if it
+        # exists, and only fall back to the env var if there's genuinely no
+        # shared connection configured at all.
+        shared_conn_result = await session.execute(
+            select(IntegrationModel).where(
+                IntegrationModel.tenant_id == tenant_id,
+                IntegrationModel.provider == IntegrationProvider.VAPI,
+                IntegrationModel.owner_user_id.is_(None),
+                IntegrationModel.disconnected_at.is_(None),
+            )
+        )
+        shared_conn = shared_conn_result.scalars().first()
+        if shared_conn and shared_conn.config.get("api_key"):
+            return VapiClient(api_key=shared_conn.config["api_key"])
         return VapiClient()
 
     conn_result = await session.execute(
@@ -47,6 +68,16 @@ async def resolve_vapi_client(session: AsyncSession, tenant_id: str, assistant_i
     conn = conn_result.scalars().first()
     if conn and conn.config.get("api_key"):
         return VapiClient(api_key=conn.config["api_key"])
+    # This assistant belongs to a specific reseller's Vapi account, but that
+    # account has no active connection with an api_key right now (disconnected,
+    # or key removed) — falling back to the platform key here is very likely
+    # WRONG, since Vapi scopes assistants per account: a real assistant ID
+    # will come back "Does Not Exist" if queried with a different account's
+    # key. Log it loudly so this isn't invisible next time.
+    log.warning(
+        "call_routing.vapi_owner_disconnected",
+        assistant_id=assistant_id, owner_user_id=owner_user_id, tenant_id=tenant_id,
+    )
     return VapiClient()
 
 
