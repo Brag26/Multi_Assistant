@@ -103,6 +103,28 @@ class SqlAlchemyIntegrationRepository:
                 set_={"label": asset["label"], "payload": asset.get("payload", {}), "owner_user_id": owner_user_id, "kind": kind, "synced_at": datetime.now(UTC)},
             )
             await self.session.execute(stmt)
+
+        # Reconcile: anything previously synced under this exact
+        # tenant/provider/owner/kind that Vapi *didn't* return this time has
+        # been deleted (or moved) upstream — remove it instead of leaving a
+        # ghost entry that looks selectable but fails every call with
+        # "assistantId ... Does Not Exist" forever.
+        # Guarded: only reconcile when Vapi actually returned something —
+        # an empty list here is far more likely a transient API hiccup than
+        # "this account now has zero assistants", and wiping every synced
+        # assistant on a flaky response would be much worse than leaving one
+        # stale ghost entry until the next successful sync.
+        if assets:
+            fresh_ids = [asset["external_id"] for asset in assets]
+            delete_stmt = delete(IntegrationAssetModel).where(
+                IntegrationAssetModel.tenant_id == tenant_id,
+                IntegrationAssetModel.provider == provider,
+                IntegrationAssetModel.kind == kind,
+                IntegrationAssetModel.owner_user_id == owner_user_id if owner_user_id else IntegrationAssetModel.owner_user_id.is_(None),
+                IntegrationAssetModel.external_id.notin_(fresh_ids),
+            )
+            await self.session.execute(delete_stmt)
+
         await self.session.commit()
         return await self.list_assets(tenant_id, provider, kind=kind)
 
