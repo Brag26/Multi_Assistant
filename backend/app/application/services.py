@@ -200,13 +200,31 @@ class CallService:
         from app.infrastructure.db.models import AssistantAssignmentModel
 
         from_number = None
-        assignment_result = await self.calls.session.execute(
-            select(AssistantAssignmentModel.phone_number).where(
-                AssistantAssignmentModel.tenant_id == tenant_id,
-                AssistantAssignmentModel.assistant_external_id == assistant_id,
-                AssistantAssignmentModel.assigned_to_user_id == user.user_id,
+        if user.role in {Role.SUPER_ADMIN, Role.TENANT_ADMIN}:
+            # Admins testing an assistant aren't necessarily the person it's
+            # assigned to — they're often testing on behalf of whichever
+            # client/reseller it's actually assigned to. Requiring the
+            # assignment to match their own user_id meant Test Call always
+            # came back "no phone number assigned" for admins, even when a
+            # real assignment with a real number existed for someone else.
+            assignment_result = await self.calls.session.execute(
+                select(AssistantAssignmentModel.phone_number).where(
+                    AssistantAssignmentModel.tenant_id == tenant_id,
+                    AssistantAssignmentModel.assistant_external_id == assistant_id,
+                    AssistantAssignmentModel.phone_number.isnot(None),
+                ).limit(1)
             )
-        )
+        else:
+            # Regular client/agent users: keep this strictly scoped to their
+            # own assignment — they should only ever be able to use what's
+            # actually assigned to them, not someone else's number.
+            assignment_result = await self.calls.session.execute(
+                select(AssistantAssignmentModel.phone_number).where(
+                    AssistantAssignmentModel.tenant_id == tenant_id,
+                    AssistantAssignmentModel.assistant_external_id == assistant_id,
+                    AssistantAssignmentModel.assigned_to_user_id == user.user_id,
+                )
+            )
         from_number = assignment_result.scalar_one_or_none()
 
         from app.application.call_routing import enforce_minute_limit, resolve_vapi_client, resolve_vapi_phone_number_id
