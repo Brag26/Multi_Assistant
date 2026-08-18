@@ -34,8 +34,8 @@ async def pause_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, s
     return await service.pause(user, tenant_id, campaign_id)
 
 @router.post("/{campaign_id}/resume", response_model=CampaignRead)
-async def resume_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):
-    return await service.resume(user, tenant_id, campaign_id)
+async def resume_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, background_tasks: BackgroundTasks, service: Annotated[CampaignService, Depends(campaign_service)]):
+    return await service.resume(user, tenant_id, campaign_id, background_tasks=background_tasks)
 
 @router.post("/{campaign_id}/cancel", response_model=CampaignRead)
 async def cancel_campaign(tenant_id: str, campaign_id: UUID, user: CurrentUser, service: Annotated[CampaignService, Depends(campaign_service)]):

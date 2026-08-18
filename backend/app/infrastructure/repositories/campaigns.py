@@ -82,7 +82,12 @@ class SqlAlchemyCampaignRepository:
             vapi_assistant_id=source.vapi_assistant_id,
             twilio_phone_number=source.twilio_phone_number,
             make_webhook_url=source.make_webhook_url,
-            scheduled_at=source.scheduled_at,
+            # Deliberately NOT copying scheduled_at — a cloned campaign's old
+            # schedule time is almost always in the past by the time you
+            # clone it, and copying it in would be confusing dead data
+            # sitting on a fresh DRAFT campaign. Pick a new time (or just
+            # hit "Launch now") instead.
+            scheduled_at=None,
             config=source.config,
         )
         self.session.add(clone)

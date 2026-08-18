@@ -118,9 +118,20 @@ class CampaignService:
         self._can_manage(user, tenant_id)
         return await self.campaigns.set_status(tenant_id, campaign_id, CampaignStatus.PAUSED)
 
-    async def resume(self, user: Principal, tenant_id: str, campaign_id: UUID):
+    async def resume(self, user: Principal, tenant_id: str, campaign_id: UUID, background_tasks=None):
+        """Resuming used to just flip the status label back to RUNNING with
+        nothing actually dialing again — the exact same silently-stuck
+        problem as everything else in this file. Re-trigger dialing, same
+        as Launch Now; _dial_campaign_contacts already skips contacts who've
+        already been called, so this won't re-dial anyone twice."""
         self._can_manage(user, tenant_id)
-        return await self.campaigns.set_status(tenant_id, campaign_id, CampaignStatus.RUNNING)
+        campaign = await self.campaigns.set_status(tenant_id, campaign_id, CampaignStatus.RUNNING)
+        if background_tasks is not None:
+            background_tasks.add_task(_dial_campaign_now, str(campaign_id), tenant_id, user.user_id)
+        else:
+            import asyncio
+            asyncio.create_task(_dial_campaign_now(str(campaign_id), tenant_id, user.user_id))
+        return campaign
 
     async def cancel(self, user: Principal, tenant_id: str, campaign_id: UUID):
         self._can_manage(user, tenant_id)
@@ -337,12 +348,25 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
         await session.commit()
         return
 
+    # Exclude contacts already successfully reached (or currently mid-call)
+    # on this campaign — but NOT ones whose call previously failed, since
+    # resuming/retrying should give those another shot, not skip them
+    # forever just because one attempt didn't connect.
+    already_called_result = await session.execute(
+        select(CallModel.contact_id).where(
+            CallModel.campaign_id == campaign_id,
+            CallModel.contact_id.isnot(None),
+            CallModel.status != CallStatus.FAILED,
+        )
+    )
+    already_called_ids = {row[0] for row in already_called_result.all()}
+
     contacts_result = await session.execute(
         select(ContactModel)
         .join(CampaignContactModel, CampaignContactModel.contact_id == ContactModel.id)
         .where(CampaignContactModel.campaign_id == campaign_id)
     )
-    contacts = contacts_result.scalars().all()
+    contacts = [c for c in contacts_result.scalars().all() if c.id not in already_called_ids]
 
     dnc_result = await session.execute(select(DncListModel.phone).where(DncListModel.tenant_id == tenant_id))
     dnc_phones = {row[0] for row in dnc_result.all()}

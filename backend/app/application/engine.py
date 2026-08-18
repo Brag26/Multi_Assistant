@@ -259,10 +259,42 @@ class WorkflowExecutionEngine:
             assistant_id = merged.get("assistant_id") or merged.get("vapi_assistant_id") or variables.get("assistant_id")
             if not phone or not assistant_id:
                 raise ValueError("Missing phone or assistant_id")
+
+            # This action path never went through the same account/number
+            # resolution as every other place calls get placed from — it
+            # used a fixed platform-only client (wrong account for
+            # per-reseller assistants) and never sent a from-number at all
+            # (Vapi rejects every call without one). Same fix as everywhere
+            # else: resolve the assistant's real owning account, and resolve
+            # a raw phone number down to Vapi's own phoneNumberId.
+            from app.application.call_routing import resolve_vapi_client, resolve_vapi_phone_number_id
+            from app.infrastructure.db.models import AssistantAssignmentModel
+            from sqlalchemy import select as _select
+
+            vapi_client = await resolve_vapi_client(self.session, tenant_id, assistant_id)
+
+            from_number = merged.get("from_number") or merged.get("phone_number") or merged.get("caller_id")
+            if not from_number:
+                assignment_result = await self.session.execute(
+                    _select(AssistantAssignmentModel.phone_number).where(
+                        AssistantAssignmentModel.tenant_id == tenant_id,
+                        AssistantAssignmentModel.assistant_external_id == assistant_id,
+                        AssistantAssignmentModel.phone_number.isnot(None),
+                    ).limit(1)
+                )
+                from_number = assignment_result.scalar_one_or_none()
+            from_number_id = await resolve_vapi_phone_number_id(self.session, tenant_id, from_number)
+            if not from_number_id:
+                raise ValueError(
+                    f"No usable Vapi phone number for assistant {assistant_id} — "
+                    "assign one a synced Vapi number, or set from_number in this action's config."
+                )
+
             call = CallModel(
                 tenant_id=tenant_id,
                 customer_phone=phone,
                 assistant_id=assistant_id,
+                from_phone_number=from_number,
                 status=CallStatus.QUEUED,
                 contact_id=variables.get("contact_id"),
                 campaign_id=variables.get("campaign_id"),
@@ -270,7 +302,7 @@ class WorkflowExecutionEngine:
             self.session.add(call)
             await self.session.commit()
             try:
-                prov_id = await self.vapi.start_call(phone, assistant_id, {"call_id": str(call.id)})
+                prov_id = await vapi_client.start_call(phone, assistant_id, {"call_id": str(call.id)}, from_phone_number_id=from_number_id)
                 call.provider_call_id = prov_id
                 call.status = CallStatus.IN_PROGRESS
                 call.started_at = datetime.now(UTC)

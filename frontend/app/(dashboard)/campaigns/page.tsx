@@ -147,10 +147,10 @@ export default function CampaignsPage() {
                         <Play className="w-3.5 h-3.5" />
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" className="h-7 px-2 text-slate-500"
-                      title="Clone"
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-slate-500 gap-1"
+                      title="Clone this campaign — same assistant, number, and contact list, ready to relaunch"
                       onClick={() => actionMut.mutate({ id: c.id, action: "clone" })}>
-                      <Copy className="w-3.5 h-3.5" />
+                      <Copy className="w-3.5 h-3.5" /> <span className="text-xs">Reuse</span>
                     </Button>
                     {(c.status === "scheduled" || c.status === "running") && (
                       <Button size="sm" variant="ghost" className="h-7 px-2 text-red-400 hover:text-red-600"

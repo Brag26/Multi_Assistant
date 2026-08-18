@@ -151,16 +151,28 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
             # were guessed values that basically never matched, so real
             # completed calls were being marked FAILED. Flip the logic:
             # default to COMPLETED, and only mark FAILED for reasons that
-            # actually indicate the call never really connected or hit a
-            # real error.
+            # actually indicate a real error (not just "nobody picked up",
+            # which is handled separately below via the voicemail/retry path).
             failure_reasons = {
-                "customer-did-not-answer", "customer-busy", "voicemail",
-                "no-answer", "unknown-error", "pipeline-error",
-                "assistant-not-found", "assistant-request-failed",
-                "database-error", "call-start-error-neither-assistant-nor-server-set",
-                "phone-call-provider-closed-websocket", "silence-timed-out",
+                "unknown-error", "pipeline-error", "assistant-not-found",
+                "assistant-request-failed", "database-error",
+                "call-start-error-neither-assistant-nor-server-set",
+                "phone-call-provider-closed-websocket",
             }
-            if ended_reason in failure_reasons:
+
+            # Voicemail / no-answer detection already existed as a fully
+            # built feature (retry queue + scheduler already process it) —
+            # it just wasn't ever actually called from here, so nothing ever
+            # populated the queue. Check it before falling through to plain
+            # COMPLETED/FAILED classification: a voicemail isn't a hard
+            # failure, it's a "try again later", and it already commits its
+            # own status/outcome when it detects one.
+            from app.api.v1.webhooks_voicemail import handle_voicemail_detection
+            was_voicemail = await handle_voicemail_detection(session, t_id, str(db_call.id), ended_reason, transcript)
+
+            if was_voicemail:
+                pass  # status/outcome/retry already handled inside
+            elif ended_reason in failure_reasons:
                 db_call.status = CallStatus.FAILED
                 db_call.outcome = CallOutcome.FAILED
             else:
