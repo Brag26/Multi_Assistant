@@ -6,7 +6,7 @@ import { ArrowLeft, Mic, UserPlus, X, RefreshCw, Phone, BarChart2 } from "lucide
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 import { adminListAccounts, type AdminAccount } from "@/lib/api-billing";
-import { refreshVapiAssistants, listAssets, type IntegrationAsset } from "@/lib/api";
+import { refreshVapiAssistants, refreshVapiNumbers, listAssets, type IntegrationAsset } from "@/lib/api";
 
 interface AssistantHolder {
   assignment_id: string;
@@ -43,11 +43,15 @@ export default function SuperadminAssistantsPage() {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [showUsage, setShowUsage] = useState(false);
+  const [showNumbers, setShowNumbers] = useState(false);
 
   async function handleSync() {
     setSyncing(true);
     try {
-      await refreshVapiAssistants(tenantId);
+      // Sync both in one click — assistants and numbers are separate Vapi
+      // endpoints, but from the user's side "Sync from Vapi" should just
+      // mean "make everything current".
+      await Promise.all([refreshVapiAssistants(tenantId), refreshVapiNumbers(tenantId).catch(() => null)]);
       await refresh();
     } finally {
       setSyncing(false);
@@ -66,12 +70,13 @@ export default function SuperadminAssistantsPage() {
     setError(null);
     try {
       const token = await getToken();
-      const [assistantsRes, accountList, numbers, usageRes] = await Promise.all([
+      const [assistantsRes, accountList, twilioNumbers, vapiNumbers, usageRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/tenants/${tenantId}/assistants`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         adminListAccounts(),
         listAssets(tenantId, "twilio").catch(() => []),
+        listAssets(tenantId, "vapi", "phone_number").catch(() => []),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/tenants/${tenantId}/assistants/phone-usage`, {
           headers: { Authorization: `Bearer ${token}` },
         }).then((r) => (r.ok ? r.json() : [])),
@@ -79,7 +84,11 @@ export default function SuperadminAssistantsPage() {
       if (!assistantsRes.ok) throw new Error("Failed to load assistants");
       setAssistants(await assistantsRes.json());
       setAccounts(accountList);
-      setPhoneNumbers(numbers);
+      // Numbers synced directly through Vapi are what actually work for
+      // placing calls (Vapi needs its own phoneNumberId, resolved from
+      // these) — Twilio-synced ones are kept too since some setups still
+      // route through Twilio directly.
+      setPhoneNumbers([...vapiNumbers, ...twilioNumbers]);
       setUsage(usageRes);
     } catch (err: any) {
       setError(err?.message || "Couldn't load assistants.");
@@ -148,6 +157,10 @@ export default function SuperadminAssistantsPage() {
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
+          <button onClick={() => setShowNumbers((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50">
+            <Phone className="w-4 h-4" /> {showNumbers ? "Hide" : "Show"} Numbers
+          </button>
           <button onClick={() => setShowUsage((v) => !v)}
             className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50">
             <BarChart2 className="w-4 h-4" /> {showUsage ? "Hide" : "Phone"} Usage
@@ -158,6 +171,43 @@ export default function SuperadminAssistantsPage() {
           </button>
         </div>
       </div>
+
+      {showNumbers && (
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5" /> Synced Phone Numbers ({phoneNumbers.length})
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              These are what "Sync from Vapi" pulled in — only numbers that show up here can actually be used to place calls.
+            </p>
+          </div>
+          {phoneNumbers.length === 0 ? (
+            <p className="text-sm text-slate-400 px-4 py-4">
+              Nothing synced yet — click "Sync from Vapi" above, or connect Twilio and sync numbers in the Setup Wizard.
+            </p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs text-slate-400">
+                  <th className="px-4 py-2 font-medium">Number</th>
+                  <th className="px-4 py-2 font-medium">Source</th>
+                  <th className="px-4 py-2 font-medium">Synced</th>
+                </tr>
+              </thead>
+              <tbody>
+                {phoneNumbers.map((p) => (
+                  <tr key={`${p.provider}:${p.external_id}`} className="border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{p.label}</td>
+                    <td className="px-4 py-2.5 text-slate-600 capitalize">{p.provider}</td>
+                    <td className="px-4 py-2.5 text-slate-400">{new Date(p.synced_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {showUsage && (
         <div className="mb-6 rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -264,13 +314,15 @@ export default function SuperadminAssistantsPage() {
               onChange={(e) => setPickedPhone(e.target.value)}
             >
               <option value="">No specific number</option>
-              {phoneNumbers.map((p) => (
-                <option key={p.external_id} value={p.label}>{p.label}</option>
-              ))}
+              {phoneNumbers
+                .filter((p, i, arr) => arr.findIndex(x => x.label === p.label) === i)
+                .map((p) => (
+                  <option key={`${p.provider}:${p.external_id}`} value={p.label}>{p.label}</option>
+                ))}
             </select>
             {phoneNumbers.length === 0 && (
               <p className="text-xs text-slate-400 -mt-3 mb-4">
-                No Twilio numbers synced — connect Twilio and sync numbers in Setup Wizard to track usage per number.
+                No numbers synced yet — click "Sync from Vapi" above (also pulls in numbers), or connect Twilio and sync in the Setup Wizard.
               </p>
             )}
             <div className="flex gap-2">

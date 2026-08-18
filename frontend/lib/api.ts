@@ -379,6 +379,7 @@ export const getCampaignContactIds = (tid: string, cid: string) => apiFetch<stri
 
 export const listIntegrations    = (tid: string) => apiFetch<Integration[]>(`/tenants/${tid}/integrations`);
 export const refreshVapiAssistants = (tid: string) => apiFetch<any[]>(`/tenants/${tid}/integrations/vapi/refresh-assistants`, { method: "POST" });
+export const refreshVapiNumbers = (tid: string) => apiFetch<any[]>(`/tenants/${tid}/integrations/vapi/refresh-numbers`, { method: "POST" });
 export const listMyAssistants = (tid: string) => apiFetch<{ external_id: string; label: string }[]>(`/tenants/${tid}/assistants`);
 export const getMySettings = (tid: string) => apiFetch<{ timezone: string | null }>(`/tenants/${tid}/settings/me`);
 export const updateMySettings = (tid: string, timezone: string) =>
@@ -428,7 +429,7 @@ export const replyToSupportEscalation = (tid: string, id: string, message: strin
   apiFetch<{ ok: boolean }>(`/tenants/${tid}/support/escalations/${id}/reply`, { method: "POST", body: JSON.stringify({ message }) });
 export const connectIntegration  = (tid: string, provider: string, p: Record<string, unknown>) => apiFetch<Integration>(`/tenants/${tid}/integrations/${provider}/connect`, { method: "POST", body: JSON.stringify(p) });
 export const disconnectIntegration = (tid: string, provider: string) => apiFetch<Integration | null>(`/tenants/${tid}/integrations/${provider}/disconnect`, { method: "POST" });
-export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make") => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets`);
+export const listAssets          = (tid: string, provider: "vapi" | "twilio" | "make", kind?: string) => apiFetch<IntegrationAsset[]>(`/tenants/${tid}/integrations/${provider}/assets${kind ? `?kind=${kind}` : ""}`);
 export const importContacts      = (tid: string, file: File) => { const form = new FormData(); form.append("file", file); return apiFetch(`/tenants/${tid}/contacts/import`, { method: "POST", body: form }); };
 export const createContact       = (tid: string, p: Partial<Contact>) => apiFetch<Contact>(`/tenants/${tid}/contacts`, { method: "POST", body: JSON.stringify(p) });
 

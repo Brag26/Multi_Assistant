@@ -48,8 +48,8 @@ async def trigger_make_scenario(tenant_id: str, payload: MakeScenarioTrigger, us
     return await service.trigger_make_scenario(user, tenant_id, payload)
 
 @router.get("/{provider}/assets", response_model=list[IntegrationAssetRead])
-async def list_assets(tenant_id: str, provider: IntegrationProvider, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)]):
-    return await service.assets(user, tenant_id, provider)
+async def list_assets(tenant_id: str, provider: IntegrationProvider, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)], kind: str | None = None):
+    return await service.assets(user, tenant_id, provider, kind=kind)
 
 @router.get("/webhook-logs", response_model=list[WebhookLogRead])
 async def webhook_logs(tenant_id: str, user: CurrentUser, service: Annotated[IntegrationService, Depends(integration_service)], provider: IntegrationProvider | None = None):
