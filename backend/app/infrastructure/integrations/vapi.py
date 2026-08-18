@@ -84,5 +84,25 @@ class VapiClient:
                 raise RuntimeError(f"Vapi chat API returned {response.status_code}: {response.text}")
             return response.json()
 
+    async def create_assistant(self, config: dict) -> dict:
+        """Creates a new Vapi assistant from a full assistant config dict
+        (name, model, voice, tools, firstMessage, etc.). Returns the created
+        assistant's full record, including its id."""
+        async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=30) as client:
+            response = await client.post("/assistant", json=config, headers=self._headers())
+            if response.status_code >= 400:
+                raise RuntimeError(f"Vapi create-assistant returned {response.status_code}: {response.text}")
+            return response.json()
+
+    async def update_assistant(self, assistant_id: str, config: dict) -> dict:
+        """Patches an existing assistant — used to re-sync the copilot's
+        config (tools, prompt) without creating a duplicate assistant every
+        time setup is re-run."""
+        async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=30) as client:
+            response = await client.patch(f"/assistant/{assistant_id}", json=config, headers=self._headers())
+            if response.status_code >= 400:
+                raise RuntimeError(f"Vapi update-assistant returned {response.status_code}: {response.text}")
+            return response.json()
+
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"}

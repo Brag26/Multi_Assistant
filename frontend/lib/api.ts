@@ -424,6 +424,17 @@ export const sendSupportChat = (tid: string, message: string, previous_chat_id?:
   apiFetch<{ chat_id: string; reply: string }>(`/tenants/${tid}/support/chat`, { method: "POST", body: JSON.stringify({ message, previous_chat_id }) });
 export const escalateSupportChat = (tid: string, message: string, conversation: { role: string; text: string }[]) =>
   apiFetch<{ ok: boolean; escalation_id: string }>(`/tenants/${tid}/support/escalate`, { method: "POST", body: JSON.stringify({ message, conversation }) });
+
+// ── Jarvis (superadmin copilot) ─────────────────────────────────────────────
+
+export interface CopilotConfig { assistant_id: string | null; vapi_public_key: string | null; configured: boolean; }
+export const getCopilotConfig = (tid: string) => apiFetch<CopilotConfig>(`/tenants/${tid}/copilot/config`);
+export const setupCopilot = (tid: string) => apiFetch<CopilotConfig>(`/tenants/${tid}/copilot/setup`, { method: "POST" });
+export const setCopilotPublicKey = (tid: string, vapi_public_key: string) =>
+  apiFetch<{ ok: boolean }>(`/tenants/${tid}/copilot/public-key`, { method: "POST", body: JSON.stringify({ vapi_public_key }) });
+export const sendCopilotChat = (tid: string, message: string, previous_chat_id?: string | null) =>
+  apiFetch<{ chat_id: string; reply: string }>(`/tenants/${tid}/copilot/chat`, { method: "POST", body: JSON.stringify({ message, previous_chat_id }) });
+
 export interface SupportEscalation {
   id: string; user_id?: string | null; user_email: string | null; message: string; status: string;
   reply?: string | null; replied_at?: string | null; created_at: string; resolved_at: string | null;

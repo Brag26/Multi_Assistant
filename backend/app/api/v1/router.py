@@ -43,6 +43,7 @@ from app.api.v1.leadgen import router as leadgen_router
 from app.api.v1.support import router as support_router
 from app.api.v1.autopilot import router as autopilot_router
 from app.api.v1.scheduler_internal import router as scheduler_internal_router
+from app.api.v1.copilot import router as copilot_router
 
 api_router = APIRouter()
 
@@ -96,3 +97,4 @@ api_router.include_router(leadgen_router)
 api_router.include_router(support_router)
 api_router.include_router(autopilot_router)
 api_router.include_router(scheduler_internal_router)
+api_router.include_router(copilot_router)

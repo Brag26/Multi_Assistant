@@ -17,6 +17,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase";
 import { useSessionStore } from "@/store/session";
 import { getMyFeatures } from "@/lib/api";
 import { SupportChatWidget } from "@/components/dashboard/SupportChatWidget";
+import { JarvisWidget } from "@/components/dashboard/JarvisWidget";
 
 interface NavItem { href: Route; label: string; icon: LucideIcon; }
 interface NavGroup { label: string; items: NavItem[]; }
@@ -289,6 +290,7 @@ export function DashboardShell({ children }: Props) {
       </main>
 
       <SupportChatWidget />
+      <JarvisWidget />
     </div>
   );
 }

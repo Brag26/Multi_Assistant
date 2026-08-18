@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     vapi_api_key: str = ""
     vapi_base_url: str = "https://api.vapi.ai"
+    # This app's own public URL — needed to tell Vapi where to send tool-call
+    # webhooks for the copilot assistant. Set to your actual Render URL
+    # (e.g. https://voice-ops-backend.onrender.com), no trailing slash.
+    backend_public_url: str = ""
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_webhook_secret: str = ""
