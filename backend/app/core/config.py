@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     make_invoice_email_webhook: str = ""
     make_support_escalation_webhook: str = ""
     autopilot_cron_secret: str = ""
+    scheduler_cron_secret: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

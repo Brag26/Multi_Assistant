@@ -266,7 +266,7 @@ class IntegrationService:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot manage integrations")
 
 
-async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user_id: str) -> None:
+async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user_id: str | None) -> None:
     """Runs in the background after 'Start Now' — dials every contact
     attached to the campaign via Vapi directly (no Celery dependency)."""
     import structlog
@@ -358,9 +358,9 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
             initiated_by_user_id=triggered_by_user_id,
             status=CallStatus.QUEUED,
         )
+        session.add(call)
+        await session.flush()
         try:
-            session.add(call)
-            await session.flush()
             provider_call_id = await vapi.start_call(
                 contact.phone, campaign.vapi_assistant_id,
                 {"call_id": str(call.id), "campaign_id": campaign_id},
@@ -368,15 +368,17 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
             call.provider_call_id = provider_call_id
             call.status = CallStatus.IN_PROGRESS
             queued += 1
-            await session.commit()
         except Exception as exc:
-            # Whether this failed writing the call row (e.g. a schema
-            # mismatch) or actually dialing out — either way, don't let
-            # it silently abort the whole campaign. Roll back, log it,
-            # and keep going to the next contact instead of leaving the
-            # campaign stuck at RUNNING forever with no explanation.
-            await session.rollback()
+            # Vapi rejected the call (bad number, bad assistant config,
+            # etc.) — mark this one call failed and move on to the next
+            # contact. Deliberately no session.rollback() here: rolling
+            # back mid-loop while the session may still be mid-flight on
+            # the failed HTTP call is what caused a much worse crash
+            # (SQLAlchemy's "greenlet_spawn has not been called") that took
+            # the whole campaign down instead of just this one call.
+            call.status = CallStatus.FAILED
             log.warning("campaign.launch_now.dial_failed", contact_id=str(contact.id), error=str(exc))
+        await session.commit()
 
     if stopped_for_limit:
         campaign.status = CampaignStatus.PAUSED
