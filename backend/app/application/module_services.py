@@ -326,11 +326,12 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
         from_number = assignment_result.scalar_one_or_none()
 
     from_number_id = await resolve_vapi_phone_number_id(session, tenant_id, from_number)
-    if from_number and not from_number_id:
-        # Same issue as Test Call: Vapi needs its own phoneNumberId, not the
-        # raw digits we have on file. Fail the whole campaign clearly up
-        # front instead of burning through every contact with the same
-        # doomed-to-fail call.
+    if not from_number_id:
+        # Vapi requires a phoneNumberId for every call — whether no number
+        # was ever assigned to this campaign/assistant, or one was set but
+        # doesn't match anything synced from Vapi, both fail the same way.
+        # Stop clearly up front instead of burning through every contact
+        # with the same doomed-to-fail call.
         log.warning("campaign.launch_now.unrecognized_number", campaign_id=campaign_id, from_number=from_number)
         campaign.status = CampaignStatus.PAUSED
         await session.commit()

@@ -162,11 +162,13 @@ class CallService:
         await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
         vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, wf.vapi_assistant_id)
         from_number_id = await resolve_vapi_phone_number_id(self.calls.session, tenant_id, wf.twilio_phone_number)
-        if wf.twilio_phone_number and not from_number_id:
-            raise HTTPException(
-                status_code=400,
-                detail=f"This workflow's phone number {wf.twilio_phone_number} isn't recognized by Vapi — sync numbers from Vapi (Manage Assistants → Sync from Vapi).",
+        if not from_number_id:
+            detail = (
+                f"This workflow's phone number {wf.twilio_phone_number} isn't recognized by Vapi — sync numbers from Vapi (Manage Assistants → Sync from Vapi)."
+                if wf.twilio_phone_number else
+                "This workflow has no phone number set — assign one before it can place calls."
             )
+            raise HTTPException(status_code=400, detail=detail)
 
         call = await self.calls.create_queued(
             tenant_id, workflow_id, request, assistant_id=wf.vapi_assistant_id, initiated_by_user_id=user.user_id
@@ -212,16 +214,18 @@ class CallService:
         await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
         vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, assistant_id)
         from_number_id = await resolve_vapi_phone_number_id(self.calls.session, tenant_id, from_number)
-        if from_number and not from_number_id:
-            # We have a raw number on file for this assignment, but it
-            # doesn't match any phone number actually synced from Vapi —
-            # Vapi needs its own phoneNumberId, not the raw digits, so this
-            # would fail with a confusing Vapi-side error otherwise. Catch
-            # it here with a clear message instead.
-            raise HTTPException(
-                status_code=400,
-                detail=f"Phone number {from_number} isn't recognized by Vapi — sync numbers from Vapi (Manage Assistants → Sync from Vapi) and make sure this assistant is assigned a synced number.",
+        if not from_number_id:
+            # Vapi requires a phoneNumberId for every call, no exceptions —
+            # so whether no number was ever assigned to this assistant at
+            # all, or one was set but doesn't match anything synced from
+            # Vapi, both cases end the same way: fail clearly here instead
+            # of letting Vapi's confusing raw rejection surface.
+            detail = (
+                f"Phone number {from_number} isn't recognized by Vapi — sync numbers from Vapi (Manage Assistants → Sync from Vapi) and make sure this assistant is assigned a synced number."
+                if from_number else
+                "This assistant has no phone number assigned — go to Manage Assistants, sync numbers from Vapi, and assign one to this assistant before calling."
             )
+            raise HTTPException(status_code=400, detail=detail)
 
         request = LaunchCallRequest(customer_phone=customer_phone)
         call = await self.calls.create_queued(

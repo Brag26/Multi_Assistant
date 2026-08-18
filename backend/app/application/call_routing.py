@@ -95,15 +95,35 @@ async def resolve_vapi_phone_number_id(session: AsyncSession, tenant_id: str, ra
     from app.domain.enums import IntegrationProvider
     from app.infrastructure.db.models import IntegrationAssetModel
 
+    def digits_only(number: str) -> str:
+        return "".join(ch for ch in number if ch.isdigit())
+
+    target = digits_only(raw_phone_number)
+    if not target:
+        return None
+
+    # Compare by digits only, not exact string — Vapi's API and whatever
+    # this app has stored (Setup Wizard input, manual entry, etc.) can
+    # differ in formatting ("+1 929-734-8240" vs "+19297348240") even when
+    # they're the same real number. An exact-string match would silently
+    # miss that and report "not recognized" for a number that's actually
+    # fine, which is worse than the small cost of fetching and comparing
+    # in Python for what's normally a short list of numbers.
     result = await session.execute(
-        select(IntegrationAssetModel.external_id).where(
+        select(IntegrationAssetModel.external_id, IntegrationAssetModel.payload).where(
             IntegrationAssetModel.tenant_id == tenant_id,
             IntegrationAssetModel.provider == IntegrationProvider.VAPI,
             IntegrationAssetModel.kind == "phone_number",
-            IntegrationAssetModel.payload["number"].astext == raw_phone_number,
         )
     )
-    return result.scalar_one_or_none()
+    for external_id, payload in result.all():
+        candidate = digits_only(str(payload.get("number", "")))
+        # Compare on the last 10 digits so a stored/synced difference in
+        # country-code prefix (e.g. "19297348240" vs "9297348240") doesn't
+        # cause a false miss either.
+        if candidate and (candidate == target or candidate[-10:] == target[-10:]):
+            return external_id
+    return None
 
 
 async def enforce_minute_limit(session: AsyncSession, tenant_id: str, user_id: str | None) -> None:
