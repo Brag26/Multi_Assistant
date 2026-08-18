@@ -16,7 +16,13 @@ class SqlAlchemyCampaignRepository:
         return result.scalars().all()
 
     async def create(self, tenant_id: str, data: CampaignCreate):
-        campaign = CampaignModel(tenant_id=tenant_id, **data.model_dump(exclude={"contact_ids"}))
+        # A campaign with a future scheduled_at should actually be
+        # SCHEDULED — otherwise it silently stays DRAFT forever and the
+        # scheduler never picks it up, even though a launch time was set.
+        values = data.model_dump(exclude={"contact_ids"})
+        if values.get("scheduled_at"):
+            values["status"] = CampaignStatus.SCHEDULED
+        campaign = CampaignModel(tenant_id=tenant_id, **values)
         self.session.add(campaign)
         await self.session.flush()
         await self.assign_contacts(campaign.id, data.contact_ids, commit=False)
@@ -29,6 +35,10 @@ class SqlAlchemyCampaignRepository:
         values = data.model_dump(exclude_unset=True, exclude={"contact_ids"})
         for key, value in values.items():
             setattr(campaign, key, value)
+        # Same fix as create(): if a schedule time just got added/changed on
+        # a campaign that's still sitting in DRAFT, actually schedule it.
+        if values.get("scheduled_at") and campaign.status == CampaignStatus.DRAFT:
+            campaign.status = CampaignStatus.SCHEDULED
         if data.contact_ids is not None:
             await self.assign_contacts(campaign.id, data.contact_ids, commit=False)
         await self.session.commit()

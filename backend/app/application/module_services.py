@@ -290,71 +290,98 @@ async def _dial_campaign_now(campaign_id: str, tenant_id: str, triggered_by_user
             await session.commit()
             return
 
-        vapi = await resolve_vapi_client(session, tenant_id, campaign.vapi_assistant_id)
+        try:
+            await _dial_campaign_contacts(session, campaign, tenant_id, campaign_id, triggered_by_user_id, log)
+        except Exception as exc:
+            # Anything unexpected here (a bad migration, a bug, whatever) —
+            # never leave the campaign stuck at RUNNING with no explanation.
+            # Roll back to a clean state and flip it to PAUSED so it's
+            # visibly not actually running, and the error is in the logs.
+            await session.rollback()
+            log.error("campaign.launch_now.crashed", campaign_id=campaign_id, error=str(exc))
+            campaign = await session.get(CampaignModel, campaign_id)
+            if campaign:
+                campaign.status = CampaignStatus.PAUSED
+                await session.commit()
 
-        from app.infrastructure.db.models import AssistantAssignmentModel
-        from_number = campaign.twilio_phone_number
-        if not from_number:
-            assignment_result = await session.execute(
-                select(AssistantAssignmentModel.phone_number).where(
-                    AssistantAssignmentModel.tenant_id == tenant_id,
-                    AssistantAssignmentModel.assistant_external_id == campaign.vapi_assistant_id,
-                ).limit(1)
-            )
-            from_number = assignment_result.scalar_one_or_none()
 
-        contacts_result = await session.execute(
-            select(ContactModel)
-            .join(CampaignContactModel, CampaignContactModel.contact_id == ContactModel.id)
-            .where(CampaignContactModel.campaign_id == campaign_id)
+async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id: str, triggered_by_user_id: str, log) -> None:
+    from sqlalchemy import select
+    from app.domain.enums import CallStatus, CampaignStatus
+    from app.infrastructure.db.models import CallModel, CampaignContactModel, ContactModel, DncListModel
+    from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+    from fastapi import HTTPException
+
+    vapi = await resolve_vapi_client(session, tenant_id, campaign.vapi_assistant_id)
+
+    from app.infrastructure.db.models import AssistantAssignmentModel
+    from_number = campaign.twilio_phone_number
+    if not from_number:
+        assignment_result = await session.execute(
+            select(AssistantAssignmentModel.phone_number).where(
+                AssistantAssignmentModel.tenant_id == tenant_id,
+                AssistantAssignmentModel.assistant_external_id == campaign.vapi_assistant_id,
+            ).limit(1)
         )
-        contacts = contacts_result.scalars().all()
+        from_number = assignment_result.scalar_one_or_none()
 
-        dnc_result = await session.execute(select(DncListModel.phone).where(DncListModel.tenant_id == tenant_id))
-        dnc_phones = {row[0] for row in dnc_result.all()}
+    contacts_result = await session.execute(
+        select(ContactModel)
+        .join(CampaignContactModel, CampaignContactModel.contact_id == ContactModel.id)
+        .where(CampaignContactModel.campaign_id == campaign_id)
+    )
+    contacts = contacts_result.scalars().all()
 
-        queued = 0
-        stopped_for_limit = False
-        for contact in contacts:
-            if contact.phone in dnc_phones:
-                continue
+    dnc_result = await session.execute(select(DncListModel.phone).where(DncListModel.tenant_id == tenant_id))
+    dnc_phones = {row[0] for row in dnc_result.all()}
 
-            try:
-                await enforce_minute_limit(session, tenant_id, triggered_by_user_id)
-            except HTTPException:
-                log.warning("campaign.launch_now.minute_limit_hit", campaign_id=campaign_id, dialed_so_far=queued)
-                stopped_for_limit = True
-                break
+    queued = 0
+    stopped_for_limit = False
+    for contact in contacts:
+        if contact.phone in dnc_phones:
+            continue
 
-            call = CallModel(
-                tenant_id=tenant_id,
-                campaign_id=campaign_id,
-                contact_id=contact.id,
-                customer_phone=contact.phone,
-                assistant_id=campaign.vapi_assistant_id,
-                from_phone_number=from_number,
-                initiated_by_user_id=triggered_by_user_id,
-                status=CallStatus.QUEUED,
-            )
+        try:
+            await enforce_minute_limit(session, tenant_id, triggered_by_user_id)
+        except HTTPException:
+            log.warning("campaign.launch_now.minute_limit_hit", campaign_id=campaign_id, dialed_so_far=queued)
+            stopped_for_limit = True
+            break
+
+        call = CallModel(
+            tenant_id=tenant_id,
+            campaign_id=campaign_id,
+            contact_id=contact.id,
+            customer_phone=contact.phone,
+            assistant_id=campaign.vapi_assistant_id,
+            from_phone_number=from_number,
+            initiated_by_user_id=triggered_by_user_id,
+            status=CallStatus.QUEUED,
+        )
+        try:
             session.add(call)
             await session.flush()
-            try:
-                provider_call_id = await vapi.start_call(
-                    contact.phone, campaign.vapi_assistant_id,
-                    {"call_id": str(call.id), "campaign_id": campaign_id},
-                )
-                call.provider_call_id = provider_call_id
-                call.status = CallStatus.IN_PROGRESS
-                queued += 1
-            except Exception as exc:
-                call.status = CallStatus.FAILED
-                log.warning("campaign.launch_now.dial_failed", contact_id=str(contact.id), error=str(exc))
+            provider_call_id = await vapi.start_call(
+                contact.phone, campaign.vapi_assistant_id,
+                {"call_id": str(call.id), "campaign_id": campaign_id},
+            )
+            call.provider_call_id = provider_call_id
+            call.status = CallStatus.IN_PROGRESS
+            queued += 1
             await session.commit()
+        except Exception as exc:
+            # Whether this failed writing the call row (e.g. a schema
+            # mismatch) or actually dialing out — either way, don't let
+            # it silently abort the whole campaign. Roll back, log it,
+            # and keep going to the next contact instead of leaving the
+            # campaign stuck at RUNNING forever with no explanation.
+            await session.rollback()
+            log.warning("campaign.launch_now.dial_failed", contact_id=str(contact.id), error=str(exc))
 
-        if stopped_for_limit:
-            campaign.status = CampaignStatus.PAUSED
-            await session.commit()
-        elif queued == 0:
-            campaign.status = CampaignStatus.COMPLETED
-            await session.commit()
-        log.info("campaign.launch_now.done", campaign_id=campaign_id, queued=queued, stopped_for_limit=stopped_for_limit)
+    if stopped_for_limit:
+        campaign.status = CampaignStatus.PAUSED
+        await session.commit()
+    elif queued == 0:
+        campaign.status = CampaignStatus.COMPLETED
+        await session.commit()
+    log.info("campaign.launch_now.done", campaign_id=campaign_id, queued=queued, stopped_for_limit=stopped_for_limit)
