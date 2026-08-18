@@ -1,6 +1,16 @@
 ﻿import httpx
 from app.core.config import settings
 
+
+class VapiCallError(Exception):
+    """Vapi rejected a call request — carries the real reason from Vapi's
+    response body instead of just a bare HTTP status code."""
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        self.message = message
+        super().__init__(f"Vapi {status_code}: {message}")
+
+
 class VapiClient:
     def __init__(self, api_key: str | None = None):
         self.api_key = api_key or settings.vapi_api_key
@@ -9,7 +19,17 @@ class VapiClient:
         payload = {"assistantId": assistant_id, "customer": {"number": phone_number}, "metadata": metadata}
         async with httpx.AsyncClient(base_url=settings.vapi_base_url, timeout=20) as client:
             response = await client.post("/call", json=payload, headers=self._headers())
-            response.raise_for_status()
+            if response.status_code >= 400:
+                # raise_for_status() alone only gives the status code, not
+                # Vapi's actual reason (e.g. "assistant not found", "invalid
+                # phone number", "insufficient credits") — that message is
+                # what shows up in Test Call and in campaign dial-failure
+                # logs, so surface it instead of a bare "400 Bad Request".
+                try:
+                    detail = response.json().get("message") or response.text
+                except Exception:
+                    detail = response.text
+                raise VapiCallError(response.status_code, detail if isinstance(detail, str) else str(detail))
             return response.json()["id"]
 
     async def fetch_assistants(self) -> list[dict]:

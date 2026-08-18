@@ -158,16 +158,20 @@ class CallService:
             raise HTTPException(status_code=400, detail="Workflow is not launchable")
 
         from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+        from app.infrastructure.integrations.vapi import VapiCallError
         await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
         vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, wf.vapi_assistant_id)
 
         call = await self.calls.create_queued(
             tenant_id, workflow_id, request, assistant_id=wf.vapi_assistant_id, initiated_by_user_id=user.user_id
         )
-        provider_call_id = await vapi_client.start_call(
-            request.customer_phone, wf.vapi_assistant_id,
-            {"call_id": str(call.id), **request.metadata},
-        )
+        try:
+            provider_call_id = await vapi_client.start_call(
+                request.customer_phone, wf.vapi_assistant_id,
+                {"call_id": str(call.id), **request.metadata},
+            )
+        except VapiCallError as exc:
+            raise HTTPException(status_code=400, detail=f"Vapi rejected the call: {exc.message}")
         await self.calls.mark_started(call.id, provider_call_id)
         if wf.make_webhook_url:
             await self.make.trigger_workflow(
@@ -197,6 +201,7 @@ class CallService:
         from_number = assignment_result.scalar_one_or_none()
 
         from app.application.call_routing import enforce_minute_limit, resolve_vapi_client
+        from app.infrastructure.integrations.vapi import VapiCallError
         await enforce_minute_limit(self.calls.session, tenant_id, user.user_id)
         vapi_client = await resolve_vapi_client(self.calls.session, tenant_id, assistant_id)
 
@@ -205,8 +210,15 @@ class CallService:
             tenant_id, None, request, assistant_id=assistant_id,
             initiated_by_user_id=user.user_id, from_phone_number=from_number,
         )
-        provider_call_id = await vapi_client.start_call(
-            customer_phone, assistant_id, {"call_id": str(call.id)},
-        )
+        try:
+            provider_call_id = await vapi_client.start_call(
+                customer_phone, assistant_id, {"call_id": str(call.id)},
+            )
+        except VapiCallError as exc:
+            # Surface Vapi's actual reason instead of a generic 500 — this is
+            # what shows up in the Test Call modal, so a real explanation
+            # (bad assistant, bad number format, no credits, etc.) is far
+            # more useful than "Internal server error".
+            raise HTTPException(status_code=400, detail=f"Vapi rejected the call: {exc.message}")
         await self.calls.mark_started(call.id, provider_call_id)
         return await self.calls.get(call.id)
