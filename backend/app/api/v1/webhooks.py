@@ -55,12 +55,18 @@ def _resolve_call_outcome(success_eval, structured_data: dict | None, transcript
 
 @router.post("/vapi")
 async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | None = None):
-    payload = await request.json()
+    raw_payload = await request.json()
+    # Vapi's actual webhook contract wraps the real event inside a top-level
+    # "message" object ({"message": {"type": ..., "call": {...}}}) — every
+    # branch below was reading straight off the top level, so on a real
+    # Vapi payload event_type and call_id both came back None and this
+    # whole handler silently did nothing, every single time.
+    payload = raw_payload.get("message", raw_payload)
     event_type = payload.get("type")
-    
+
     # Log the incoming webhook
-    await SqlAlchemyIntegrationRepository(session).log_webhook(tenant_id, IntegrationProvider.VAPI, "inbound", payload, 200, event_type)
-    
+    await SqlAlchemyIntegrationRepository(session).log_webhook(tenant_id, IntegrationProvider.VAPI, "inbound", raw_payload, 200, event_type)
+
     call_id_str = payload.get("call", {}).get("metadata", {}).get("call_id")
     db_call = None
     if call_id_str:
@@ -69,9 +75,33 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
             db_call = await SqlAlchemyCallRepository(session).get(db_call_id)
         except Exception as e:
             log.warning("vapi.webhook.find_call_failed", error=str(e))
-            
+
+    if not db_call:
+        # Fallback: match on Vapi's own call ID, which we always stored
+        # reliably as provider_call_id right when the call was created —
+        # more robust than depending on our metadata surviving the round
+        # trip through Vapi's servers intact.
+        from sqlalchemy import select
+        vapi_call_id = payload.get("call", {}).get("id")
+        if vapi_call_id:
+            result = await session.execute(select(CallModel).where(CallModel.provider_call_id == vapi_call_id))
+            db_call = result.scalar_one_or_none()
+
     engine = WorkflowExecutionEngine(session)
-    
+
+    # Vapi's real event names: "status-update" (with call.status one of
+    # "queued"/"ringing"/"in-progress"/"forwarding"/"ended") for the
+    # in-flight lifecycle, and a separate final "end-of-call-report" with
+    # the transcript/recording/analysis. Map both onto this app's existing
+    # call.started / call.answered / call.ended handling below.
+    call_status = payload.get("call", {}).get("status")
+    if event_type == "status-update" and call_status == "in-progress":
+        event_type = "call.started"
+    elif event_type == "status-update" and call_status == "forwarding":
+        event_type = "call.answered"
+    elif event_type == "end-of-call-report":
+        event_type = "call.ended"
+
     if db_call:
         t_id = db_call.tenant_id
         # Update call details based on event
@@ -115,12 +145,27 @@ async def vapi_webhook(request: Request, session: SessionDep, tenant_id: str | N
             db_call.success_evaluation = str(success_eval) if success_eval is not None else None
             db_call.ended_at = datetime.now(UTC)
             
-            if ended_reason in ["normal", "customer-hung-up", "agent-hung-up"]:
-                db_call.status = CallStatus.COMPLETED
-                db_call.outcome = _resolve_call_outcome(success_eval, db_call.structured_data, transcript)
-            else:
+            # Vapi's real endedReason values (customer-ended-call,
+            # assistant-ended-call, exceeded-max-duration, etc.) don't match
+            # "normal"/"customer-hung-up"/"agent-hung-up" at all — those
+            # were guessed values that basically never matched, so real
+            # completed calls were being marked FAILED. Flip the logic:
+            # default to COMPLETED, and only mark FAILED for reasons that
+            # actually indicate the call never really connected or hit a
+            # real error.
+            failure_reasons = {
+                "customer-did-not-answer", "customer-busy", "voicemail",
+                "no-answer", "unknown-error", "pipeline-error",
+                "assistant-not-found", "assistant-request-failed",
+                "database-error", "call-start-error-neither-assistant-nor-server-set",
+                "phone-call-provider-closed-websocket", "silence-timed-out",
+            }
+            if ended_reason in failure_reasons:
                 db_call.status = CallStatus.FAILED
                 db_call.outcome = CallOutcome.FAILED
+            else:
+                db_call.status = CallStatus.COMPLETED
+                db_call.outcome = _resolve_call_outcome(success_eval, db_call.structured_data, transcript)
                 
             await session.commit()
 
