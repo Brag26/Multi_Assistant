@@ -8,6 +8,7 @@ assistant with copilot_tools' tool schemas and a serverUrl pointing back at
 this module's webhook. The webhook then dispatches incoming tool calls to
 the matching handler in copilot_tools.py.
 """
+import secrets
 from typing import Annotated
 
 import structlog
@@ -114,9 +115,18 @@ async def setup_copilot(tenant_id: str, user=Depends(SuperAdmin), session: Async
         )
 
     server_url = f"{settings.backend_public_url}/api/v1/tenants/{tenant_id}/copilot/tool-calls"
-    config = _assistant_config(server_url, first_message="Jarvis online. What do you need?")
 
     cfg = (tenant.settings or {}).get("copilot", {})
+    # Generate a webhook secret once and keep reusing it — this is what
+    # stops anyone who finds/guesses this URL from POSTing fake tool calls
+    # and triggering real actions (launch/cancel a campaign, etc.) with no
+    # auth at all. Embedded in the server URL as a query param since Vapi
+    # doesn't let you attach custom auth headers to a tool's server config.
+    webhook_secret = cfg.get("webhook_secret") or secrets.token_urlsafe(32)
+    server_url_with_secret = f"{server_url}?secret={webhook_secret}"
+
+    config = _assistant_config(server_url_with_secret, first_message="Jarvis online. What do you need?")
+
     client = VapiClient()  # platform key — this assistant isn't tied to any one reseller's account
     if cfg.get("assistant_id"):
         try:
@@ -131,7 +141,7 @@ async def setup_copilot(tenant_id: str, user=Depends(SuperAdmin), session: Async
     if not assistant_id:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Vapi didn't return an assistant id")
 
-    tenant.settings = {**(tenant.settings or {}), "copilot": {**cfg, "assistant_id": assistant_id}}
+    tenant.settings = {**(tenant.settings or {}), "copilot": {**cfg, "assistant_id": assistant_id, "webhook_secret": webhook_secret}}
     await session.commit()
 
     return {
@@ -178,6 +188,17 @@ async def copilot_tool_calls(tenant_id: str, request: Request, session: AsyncSes
     single-line; line breaks break Vapi's response parser.
     """
     raw_payload = await request.json()
+
+    # Verify the secret embedded in the server URL at setup time — without
+    # this, anyone who finds this URL could POST fake tool calls and
+    # trigger real actions (cancel a campaign, etc.) with zero auth.
+    tenant = await session.get(TenantModel, tenant_id)
+    expected_secret = ((tenant.settings or {}).get("copilot", {}) if tenant else {}).get("webhook_secret")
+    provided_secret = request.query_params.get("secret")
+    if not expected_secret or provided_secret != expected_secret:
+        log.warning("copilot.tool_calls.auth_failed", tenant_id=tenant_id)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or missing webhook secret")
+
     payload = raw_payload.get("message", raw_payload)
     tool_calls = payload.get("toolCallList") or payload.get("toolCalls") or []
 

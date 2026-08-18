@@ -10,7 +10,7 @@ import {
   Plug, CalendarCheck, Bell, BarChart2, Shield, Activity,
   TrendingUp, ShieldOff, Webhook, Trophy, FileBarChart,
   Sun, Moon, Sparkles, LogOut, Settings, User, ChevronUp,
-  ShieldCheck, Zap, Mic, Target, CreditCard, LifeBuoy,
+  ShieldCheck, Zap, Mic, Target, CreditCard, LifeBuoy, RefreshCw,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
@@ -153,10 +153,17 @@ export function DashboardShell({ children }: Props) {
               <span className="ml-1.5 text-[10px] font-semibold bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded-full align-middle">AI</span>
             </div>
           </div>
-          <button onClick={toggleTheme}
-            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => window.location.reload()}
+              title="Refresh this page — use this if something looks stuck mid-action"
+              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button onClick={toggleTheme}
+              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Nav */}
