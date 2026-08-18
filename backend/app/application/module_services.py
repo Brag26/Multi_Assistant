@@ -390,6 +390,7 @@ async def _dial_campaign_contacts(session, campaign, tenant_id: str, campaign_id
             contact_id=contact.id,
             customer_phone=contact.phone,
             assistant_id=campaign.vapi_assistant_id,
+            provider="vapi",
             from_phone_number=from_number,
             initiated_by_user_id=triggered_by_user_id,
             status=CallStatus.QUEUED,

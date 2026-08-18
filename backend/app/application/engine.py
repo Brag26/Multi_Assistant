@@ -294,6 +294,7 @@ class WorkflowExecutionEngine:
                 tenant_id=tenant_id,
                 customer_phone=phone,
                 assistant_id=assistant_id,
+                provider="vapi",
                 from_phone_number=from_number,
                 status=CallStatus.QUEUED,
                 contact_id=variables.get("contact_id"),

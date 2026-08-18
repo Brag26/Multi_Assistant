@@ -2,7 +2,7 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.schemas import LaunchCallRequest
@@ -98,6 +98,7 @@ class SqlAlchemyCallRepository:
             contact_id=str(request.contact_id) if request.contact_id else None,
             campaign_id=str(request.campaign_id) if request.campaign_id else None,
             assistant_id=assistant_id,
+            provider="vapi",
             customer_phone=request.customer_phone,
             from_phone_number=from_phone_number,
             initiated_by_user_id=initiated_by_user_id,
@@ -131,3 +132,24 @@ class SqlAlchemyCallRepository:
         if reason:
             call.metadata_["fail_reason"] = reason
         await self.session.commit()
+
+    async def delete(self, tenant_id: str, call_id: UUID) -> bool:
+        """Deletes one call row. Only affects rows within this tenant, so a
+        malformed/malicious call_id from a different tenant can't be used
+        to delete someone else's data."""
+        result = await self.session.execute(
+            delete(CallModel).where(CallModel.id == call_id, CallModel.tenant_id == tenant_id)
+        )
+        await self.session.commit()
+        return result.rowcount > 0
+
+    async def bulk_delete(self, tenant_id: str, call_ids: list[UUID]) -> int:
+        """Deletes multiple call rows in one query — used by the Calls
+        page's "select all + delete" flow instead of one request per row."""
+        if not call_ids:
+            return 0
+        result = await self.session.execute(
+            delete(CallModel).where(CallModel.id.in_(call_ids), CallModel.tenant_id == tenant_id)
+        )
+        await self.session.commit()
+        return result.rowcount

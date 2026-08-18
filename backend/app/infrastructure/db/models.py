@@ -413,6 +413,11 @@ class CallModel(Base):
     contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), index=True)
     campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"), index=True)
     assistant_id: Mapped[str | None] = mapped_column(String(180))
+    # Which voice-AI platform actually placed this call — everything today
+    # is Vapi, but this is what lets recording retrieval (and anything else
+    # provider-specific) dispatch correctly once a second platform is added,
+    # instead of every call site silently assuming Vapi forever.
+    provider: Mapped[str] = mapped_column(String(20), default="vapi", server_default="vapi", nullable=False)
     customer_phone: Mapped[str] = mapped_column(String(40), nullable=False)
     from_phone_number: Mapped[str | None] = mapped_column(String(40), index=True)
     initiated_by_user_id: Mapped[str | None] = mapped_column(UUID(as_uuid=False), index=True)

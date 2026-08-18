@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function DataTable<T extends { id: string }>({ columns, rows }: { columns: { key: keyof T | string; label: string; render?: (row: T) => ReactNode }[]; rows: T[] }) {
+export function DataTable<T extends { id: string }>({ columns, rows }: { columns: { key: keyof T | string; label: ReactNode; render?: (row: T) => ReactNode }[]; rows: T[] }) {
   const getValue = (row: T, key: keyof T | string): unknown => {
     if (typeof key === 'string') {
       return (row as Record<string, unknown>)[key];

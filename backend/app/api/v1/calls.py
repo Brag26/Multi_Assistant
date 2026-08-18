@@ -36,6 +36,42 @@ class TestCallRequest(BaseModel):
     customer_phone: str
 
 
+class BulkDeleteRequest(BaseModel):
+    call_ids: list[str]
+
+
+@router.post("/bulk-delete")
+async def bulk_delete_calls(tenant_id: str, body: BulkDeleteRequest, user: CurrentUser, session: SessionDep):
+    require_tenant_access(user, tenant_id)
+    if user.role not in {Role.SUPER_ADMIN, Role.TENANT_ADMIN}:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed to delete call history")
+    from uuid import UUID
+    try:
+        ids = [UUID(c) for c in body.call_ids]
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid call id in list")
+    deleted_count = await SqlAlchemyCallRepository(session).bulk_delete(tenant_id, ids)
+    return {"deleted": deleted_count}
+
+
+@router.delete("/{call_id}")
+async def delete_call(tenant_id: str, call_id: str, user: CurrentUser, session: SessionDep):
+    """Deleting call history is destructive and affects your audit trail —
+    restricted to superadmin/reseller, not regular client/agent accounts,
+    same as other data-management actions in this app."""
+    require_tenant_access(user, tenant_id)
+    if user.role not in {Role.SUPER_ADMIN, Role.TENANT_ADMIN}:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed to delete call history")
+    from uuid import UUID
+    try:
+        deleted = await SqlAlchemyCallRepository(session).delete(tenant_id, UUID(call_id))
+    except ValueError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid call id")
+    if not deleted:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Call not found")
+    return {"ok": True}
+
+
 @router.post("/test", response_model=CallRead, status_code=202)
 async def launch_test_call(
     tenant_id: str,
@@ -68,12 +104,23 @@ async def get_call_recording_url(
     if not call or str(call.tenant_id) != tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Call not found")
     if not call.provider_call_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "This call has no Vapi recording")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"This call has no {call.provider} recording")
 
     signed_url = None
-    if call.assistant_id:
-        client = await resolve_vapi_client(session, tenant_id, call.assistant_id)
-        signed_url = await client.get_recording_url(call.provider_call_id, kind=kind)
+    if call.provider == "vapi":
+        if call.assistant_id:
+            client = await resolve_vapi_client(session, tenant_id, call.assistant_id)
+            signed_url = await client.get_recording_url(call.provider_call_id, kind=kind)
+    else:
+        # Extension point for future platforms: add a branch here that
+        # resolves the right client for `call.provider` and fetches its
+        # recording the same way. Raising clearly instead of silently
+        # trying (and failing) the Vapi path for a call that never went
+        # through Vapi.
+        raise HTTPException(
+            status.HTTP_501_NOT_IMPLEMENTED,
+            f"Recording retrieval isn't implemented yet for provider '{call.provider}'.",
+        )
     if not signed_url:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No recording available for this call")
     return {"recording_url": signed_url}

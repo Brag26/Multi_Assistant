@@ -1,12 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { Download, FileText } from "lucide-react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Download, FileText, Trash2 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { DataTable } from "@/components/dashboard/data-table";
 import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/store/session";
-import { listCalls, getRecordingUrl, type CallRecord } from "@/lib/api";
+import { listCalls, getRecordingUrl, deleteCall, bulkDeleteCalls, type CallRecord } from "@/lib/api";
 import { RecordingDownloadMenu } from "@/components/dashboard/RecordingDownloadMenu";
 import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
 
@@ -51,11 +52,57 @@ async function openRecording(tenantId: string, callId: string) {
 export default function CallsPage() {
   const tenantId = useSessionStore((s) => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
   const viewAsUserId = useSessionStore((s) => s.viewAsUserId);
+  const role = useSessionStore((s) => s.role);
+  const canDelete = role === "super_admin" || role === "tenant_admin";
+  const queryClient = useQueryClient();
+
   const { data = [], isLoading } = useQuery({
     queryKey: ["calls", tenantId, viewAsUserId],
     queryFn: () => listCalls(tenantId, undefined, viewAsUserId),
     enabled: Boolean(tenantId),
   });
+
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const allSelected = data.length > 0 && selected.size === data.length;
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(data.map((r) => r.id)));
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleDeleteSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`Delete ${selected.size} call${selected.size === 1 ? "" : "s"}? This can't be undone.`)) return;
+    setDeleting(true);
+    try {
+      await bulkDeleteCalls(tenantId, Array.from(selected));
+      setSelected(new Set());
+      queryClient.invalidateQueries({ queryKey: ["calls", tenantId] });
+    } catch (err: any) {
+      alert(err?.message || "Couldn't delete those calls.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function handleDeleteOne(id: string) {
+    if (!confirm("Delete this call? This can't be undone.")) return;
+    try {
+      await deleteCall(tenantId, id);
+      setSelected((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      queryClient.invalidateQueries({ queryKey: ["calls", tenantId] });
+    } catch (err: any) {
+      alert(err?.message || "Couldn't delete this call.");
+    }
+  }
 
   const transcriptCount = data.filter((r) => r.transcript).length;
 
@@ -68,6 +115,17 @@ export default function CallsPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <ViewAsSelector />
+          {canDelete && selected.size > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50"
+              disabled={deleting}
+              onClick={handleDeleteSelected}
+            >
+              <Trash2 className="w-3.5 h-3.5" /> {deleting ? "Deleting…" : `Delete Selected (${selected.size})`}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -86,6 +144,26 @@ export default function CallsPage() {
         <DataTable<CallRecord>
           rows={data}
           columns={[
+            ...(canDelete ? [{
+              key: "__select",
+              label: (
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              ),
+              render: (row: CallRecord) => (
+                <input
+                  type="checkbox"
+                  checked={selected.has(row.id)}
+                  onChange={() => toggleOne(row.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+              ),
+            }] : []),
             { key: "customer_phone", label: "Phone" },
             { key: "campaign_id", label: "Campaign" },
             { key: "assistant_id", label: "Assistant" },
@@ -129,6 +207,19 @@ export default function CallsPage() {
                   <span className="text-slate-400">—</span>
                 ),
             },
+            ...(canDelete ? [{
+              key: "__delete",
+              label: "",
+              render: (row: CallRecord) => (
+                <button
+                  onClick={() => handleDeleteOne(row.id)}
+                  title="Delete this call"
+                  className="text-slate-300 hover:text-red-600"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              ),
+            }] : []),
           ]}
         />
       )}

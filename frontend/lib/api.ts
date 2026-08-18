@@ -302,6 +302,11 @@ export async function downloadCallRecording(tid: string, callId: string, kind: R
   URL.revokeObjectURL(objectUrl);
 }
 
+export const deleteCall = (tid: string, callId: string) =>
+  apiFetch<{ ok: boolean }>(`/tenants/${tid}/calls/${callId}`, { method: "DELETE" });
+export const bulkDeleteCalls = (tid: string, callIds: string[]) =>
+  apiFetch<{ deleted: number }>(`/tenants/${tid}/calls/bulk-delete`, { method: "POST", body: JSON.stringify({ call_ids: callIds }) });
+
 // ─── Workflows ────────────────────────────────────────────────────────────────
 
 export const listWorkflows     = (tid: string) => apiFetch<Workflow[]>(`/tenants/${tid}/workflows`);
