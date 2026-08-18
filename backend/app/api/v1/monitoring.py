@@ -5,7 +5,7 @@ api/v1/monitoring.py — Call monitoring, lead tracking, appointment tracking,
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import get_db_session
 from app.application.schemas import (
@@ -278,6 +278,7 @@ async def get_realtime_dashboard(
     tenant_id: str,
     user: CurrentUser,
     session: AsyncSession = Depends(get_db_session),
+    view_as_user_id: str | None = None,
 ):
     """Snapshot for Supabase Realtime; also polled every 10s as fallback."""
     analytics_repo = SqlAlchemyAnalyticsRepository(session)
@@ -285,7 +286,12 @@ async def get_realtime_dashboard(
     notif_repo = SqlAlchemyNotificationRepository(session)
 
     snapshot = await analytics_repo.get_dashboard_snapshot(tenant_id)
-    recent_calls = await call_repo.list_for_user(tenant_id, user.user_id, user.role == Role.SUPER_ADMIN, limit=10)
+    if view_as_user_id:
+        if user.role != Role.SUPER_ADMIN:
+            raise HTTPException(status_code=403, detail="Only superadmin can view another account's data")
+        recent_calls = await call_repo.list_for_user(tenant_id, view_as_user_id, is_super_admin=False, limit=10)
+    else:
+        recent_calls = await call_repo.list_for_user(tenant_id, user.user_id, user.role == Role.SUPER_ADMIN, limit=10)
     recent_notifs = await notif_repo.list_for_tenant(tenant_id, unread_only=False, limit=10)
 
     return {

@@ -327,7 +327,13 @@ export const listRunSteps  = (tid: string, id: string, rid: string) => apiFetch<
 
 // ─── Calls ────────────────────────────────────────────────────────────────────
 
-export const listCalls      = (tid: string, status?: string) => apiFetch<CallRecord[]>(`/tenants/${tid}/calls${status ? `?status=${status}` : ""}`);
+export const listCalls      = (tid: string, status?: string, viewAsUserId?: string | null) => {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (viewAsUserId) params.set("view_as_user_id", viewAsUserId);
+  const qs = params.toString();
+  return apiFetch<CallRecord[]>(`/tenants/${tid}/calls${qs ? `?${qs}` : ""}`);
+};
 export const testCall       = (tid: string, assistant_id: string, customer_phone: string) => apiFetch<CallRecord>(`/tenants/${tid}/calls/test`, { method: "POST", body: JSON.stringify({ assistant_id, customer_phone }) });
 export const listActiveCalls= (tid: string) => apiFetch<CallRecord[]>(`/tenants/${tid}/calls/active`);
 export const addCallEvent   = (tid: string, callId: string, p: Partial<CallMonitoringEvent>) => apiFetch<CallMonitoringEvent>(`/tenants/${tid}/calls/${callId}/events`, { method: "POST", body: JSON.stringify(p) });
@@ -358,7 +364,7 @@ export const markAllNotificationsRead = (tid: string) => apiFetch(`/tenants/${ti
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
 export const getAnalytics        = (tid: string, days = 30) => apiFetch<Analytics>(`/tenants/${tid}/analytics?days=${days}`);
-export const getDashboardSnapshot= (tid: string) => apiFetch<DashboardSnapshot>(`/tenants/${tid}/analytics/dashboard`);
+export const getDashboardSnapshot= (tid: string, viewAsUserId?: string | null) => apiFetch<DashboardSnapshot>(`/tenants/${tid}/analytics/dashboard${viewAsUserId ? `?view_as_user_id=${viewAsUserId}` : ""}`);
 
 // ─── Audit Logs ───────────────────────────────────────────────────────────────
 

@@ -9,16 +9,18 @@ import { DashboardShell } from "@/components/dashboard/shell";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PhoneCall, Users, CalendarCheck, Bell, Activity, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
 import { NotificationCenter } from "@/components/dashboard/NotificationCenter";
+import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
 
 export default function DashboardPage() {
   const tenantId = useSessionStore(s => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
+  const viewAsUserId = useSessionStore(s => s.viewAsUserId);
   const queryClient = useQueryClient();
   const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "live" | "polling">("connecting");
 
   // Poll snapshot every 10s as fallback
   const { data: snapshot } = useQuery<DashboardSnapshot>({
-    queryKey: ["dashboard", tenantId],
-    queryFn: () => getDashboardSnapshot(tenantId),
+    queryKey: ["dashboard", tenantId, viewAsUserId],
+    queryFn: () => getDashboardSnapshot(tenantId, viewAsUserId),
     enabled: Boolean(tenantId),
     refetchInterval: 10_000,
   });
@@ -91,11 +93,14 @@ export default function DashboardPage() {
           <p className="text-sm font-medium text-blue-700">Overview</p>
           <h2 className="text-2xl font-semibold tracking-tight">Real-Time Dashboard</h2>
         </div>
-        <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${
-          realtimeStatus === "live" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${realtimeStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
-          {realtimeStatus === "live" ? "Live" : realtimeStatus === "polling" ? "Polling" : "Connecting"}
+        <div className="flex items-center gap-2">
+          <ViewAsSelector />
+          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${
+            realtimeStatus === "live" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${realtimeStatus === "live" ? "bg-emerald-500" : "bg-amber-500"}`} />
+            {realtimeStatus === "live" ? "Live" : realtimeStatus === "polling" ? "Polling" : "Connecting"}
+          </div>
         </div>
       </div>
 

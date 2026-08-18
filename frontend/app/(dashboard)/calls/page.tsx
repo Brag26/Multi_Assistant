@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useSessionStore } from "@/store/session";
 import { listCalls, getRecordingUrl, type CallRecord } from "@/lib/api";
 import { RecordingDownloadMenu } from "@/components/dashboard/RecordingDownloadMenu";
+import { ViewAsSelector } from "@/components/dashboard/ViewAsSelector";
 
 function downloadText(filename: string, content: string) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -49,9 +50,10 @@ async function openRecording(tenantId: string, callId: string) {
 
 export default function CallsPage() {
   const tenantId = useSessionStore((s) => s.tenantId) ?? process.env.NEXT_PUBLIC_DEMO_TENANT_ID ?? "";
+  const viewAsUserId = useSessionStore((s) => s.viewAsUserId);
   const { data = [], isLoading } = useQuery({
-    queryKey: ["calls", tenantId],
-    queryFn: () => listCalls(tenantId),
+    queryKey: ["calls", tenantId, viewAsUserId],
+    queryFn: () => listCalls(tenantId, undefined, viewAsUserId),
     enabled: Boolean(tenantId),
   });
 
@@ -64,15 +66,18 @@ export default function CallsPage() {
           <p className="text-sm font-medium text-blue-700">Call history</p>
           <h2 className="text-2xl font-semibold tracking-tight">Calls</h2>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="gap-1.5 shrink-0"
-          disabled={transcriptCount === 0}
-          onClick={() => downloadAllTranscripts(data)}
-        >
-          <Download className="w-3.5 h-3.5" /> Download All Transcripts ({transcriptCount})
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <ViewAsSelector />
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            disabled={transcriptCount === 0}
+            onClick={() => downloadAllTranscripts(data)}
+          >
+            <Download className="w-3.5 h-3.5" /> Download All Transcripts ({transcriptCount})
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

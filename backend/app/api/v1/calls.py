@@ -13,8 +13,17 @@ from fastapi import Depends
 router = APIRouter(prefix="/tenants/{tenant_id}/calls", tags=["calls"])
 
 @router.get("", response_model=list[CallRead])
-async def list_calls(tenant_id: str, user: CurrentUser, session: SessionDep, campaign_id: str | None = None, contact_id: str | None = None):
+async def list_calls(tenant_id: str, user: CurrentUser, session: SessionDep, campaign_id: str | None = None, contact_id: str | None = None, view_as_user_id: str | None = None):
     require_tenant_access(user, tenant_id)
+    # "View As" — superadmin explicitly picking a specific account to look
+    # at, instead of everything being silently merged/scoped to their own.
+    # Only superadmin gets this; a reseller can't view_as an arbitrary user.
+    if view_as_user_id:
+        if user.role != Role.SUPER_ADMIN:
+            raise HTTPException(status_code=403, detail="Only superadmin can view another account's data")
+        return await SqlAlchemyCallRepository(session).list_for_user(
+            tenant_id, view_as_user_id, is_super_admin=False, campaign_id=campaign_id, contact_id=contact_id,
+        )
     # Scoped to this account holder's own assistants/calls — including for
     # superadmin, who otherwise saw every call across every reseller/client.
     return await SqlAlchemyCallRepository(session).list_for_user(
